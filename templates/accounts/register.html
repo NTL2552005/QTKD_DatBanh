@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}Tạo tài khoản — BiBi Cake{% endblock %}
+
+{% block content %}
+<section class="auth-wrap page-shell">
+    <div class="auth-card">
+        <span class="eyebrow">CHÀO MỪNG BẠN</span>
+        <h1>Tạo tài khoản</h1>
+        <p class="muted">Đăng ký tài khoản khách hàng BiBi Cake.</p>
+        <form method="post" class="form-stack">
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+                <div class="form-errors">{{ form.non_field_errors }}</div>
+            {% endif %}
+            {% for field in form %}
+                <div class="form-field">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}<div class="field-help">{{ field.help_text|safe }}</div>{% endif %}
+                    {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+                </div>
+            {% endfor %}
+            <button class="button button-primary button-full" type="submit">Đăng ký</button>
+        </form>
+        <p class="auth-alternative">Đã có tài khoản? <a href="{% url 'accounts:login' %}">Đăng nhập</a></p>
+    </div>
+</section>
+{% endblock %}
