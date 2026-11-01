@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% load catalog_format %}
+
+{% block title %}Duyệt báo giá tiếp nhận — BiBi Cake{% endblock %}
+
+{% block content %}
+<section class="management-page page-shell">
+    <a class="back-link" href="{% url 'orders:owner_approval_list' %}">← Danh sách chờ duyệt</a>
+    <div class="order-detail-heading">
+        <div><span class="eyebrow">CHỦ CỬA HÀNG · DUYỆT BÁO GIÁ TIẾP NHẬN</span><h1>{{ order.code }}</h1></div>
+        <span class="status-pill status-order">Yêu cầu v{{ approval.request_revision }}</span>
+    </div>
+    <div class="order-content-grid">
+        <div class="order-main-column">
+            <section class="order-section">
+                <h2>Căn cứ phân loại vượt quyền</h2>
+                <ul class="change-list">{% for reason in authority_reason_labels %}<li>{{ reason }}</li>{% endfor %}</ul>
+                <p>{{ approval.authority_details|linebreaksbr }}</p>
+                <p class="field-help">Phân loại được STAFF thực hiện thủ công; chưa có chính sách quyền hạn được cấu hình để hệ thống tự quyết định.</p>
+            </section>
+            <section class="order-section">
+                <h2>Yêu cầu đã kiểm tra</h2>
+                <p><strong>Mẫu:</strong> {{ approval.request_snapshot.cake_name_snapshot }} · {{ approval.request_snapshot.size }} · {{ approval.request_snapshot.flavor }} · {{ approval.request_snapshot.quantity }} chiếc</p>
+                <p><strong>Nội dung:</strong> {{ approval.request_snapshot.inscription|default:"Không có" }}</p>
+                <p><strong>Trang trí:</strong> {{ approval.request_snapshot.decoration_request|default:"Không có"|linebreaksbr }}</p>
+                <p><strong>Thời gian yêu cầu:</strong> {{ approval.request_snapshot.desired_delivery_at }}</p>
+                <p class="field-help">Kiểm tra khả năng đáp ứng bởi {{ approval.availability_check.checked_by.get_full_name|default:approval.availability_check.checked_by.username }} · {{ approval.availability_check.checked_at|date:"d/m/Y H:i" }}.</p>
+            </section>
+            <section class="order-section">
+                <h2>Điều khoản báo giá cần quyết định</h2>
+                <dl class="order-data">
+                    <div><dt>Đơn giá</dt><dd>{{ approval.quote_snapshot.unit_price|vnd }} / chiếc</dd></div>
+                    <div><dt>Thành tiền bánh</dt><dd>{{ approval.quote_snapshot.cake_total|vnd }}</dd></div>
+                    <div><dt>Phí giao</dt><dd>{{ approval.quote_snapshot.delivery_fee|vnd }}</dd></div>
+                    <div><dt>Tổng tiền</dt><dd><strong>{{ approval.quote_snapshot.total|vnd }}</strong></dd></div>
+                    <div><dt>Lịch giao đề xuất</dt><dd>{{ approval.quote_snapshot.proposed_delivery_at }}</dd></div>
+                    <div><dt>Hạn chấp nhận</dt><dd>{{ approval.quote_snapshot.expires_at }}</dd></div>
+                    <div><dt>Ghi chú báo giá</dt><dd>{{ approval.quote_snapshot.notes|default:"Không có"|linebreaksbr }}</dd></div>
+                </dl>
+                <p class="field-help">Số lượng: {{ approval.quote_snapshot.quantity }} chiếc. Quyết định này duyệt chính xác giá, lịch và nội dung trên; không gửi báo giá cho khách và không xác nhận đơn. STAFF phải gửi đúng các điều khoản đã duyệt.</p>
+            </section>
+        </div>
+        <aside class="order-side-column">
+            <section class="order-section action-card">
+                <h2>Quyết định của OWNER</h2>
+                <form method="post" action="{% url 'orders:owner_decide_intake_quote_approval' approval.pk %}" class="form-stack compact-form">
+                    {% csrf_token %}{{ form.expected_order_version }}{{ form.expected_approval_revision }}
+                    {% for field in form %}{% if not field.is_hidden %}<div class="form-field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}</div>{% endif %}{% endfor %}
+                    <button class="button button-primary" type="submit" data-submit-once>Ghi nhận quyết định</button>
+                </form>
+            </section>
+        </aside>
+    </div>
+</section>
+{% endblock %}

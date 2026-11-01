@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}Duyệt sự cố — BiBi Cake{% endblock %}
+
+{% block content %}
+<section class="management-page page-shell">
+    <div class="management-heading">
+        <div><span class="eyebrow">KHU VỰC CHỦ CỬA HÀNG</span><h1>Sự cố chờ quyết định</h1><p>Xem sự cố, lịch giao và các khoản đã thu trước khi duyệt phương án.</p></div>
+    </div>
+    {% if page_obj.object_list %}
+        <div class="table-wrap"><table class="management-table">
+            <thead><tr><th>Đơn</th><th>Loại sự cố</th><th>Người báo</th><th>Phương án</th><th></th></tr></thead>
+            <tbody>{% for incident in page_obj %}
+                <tr>
+                    <td><strong>{{ incident.order.code }}</strong><small>{{ incident.created_at|date:"d/m/Y H:i" }}</small></td>
+                    <td>{{ incident.get_incident_type_display }}</td>
+                    <td>{{ incident.reported_by.get_full_name|default:incident.reported_by.username }}</td>
+                    <td>{{ incident.get_proposed_resolution_display|default:"Chưa đề xuất" }}</td>
+                    <td><a class="text-link" href="{% url 'orders:owner_incident_detail' incident.pk %}">Xem và quyết định</a></td>
+                </tr>
+            {% endfor %}</tbody>
+        </table></div>
+        {% include "orders/partials/pagination.html" %}
+    {% else %}
+        <div class="empty-state"><span aria-hidden="true">✿</span><h2>Không có sự cố chờ duyệt</h2><p>Khi nhân viên gửi phương án xử lý, yêu cầu sẽ xuất hiện tại đây.</p></div>
+    {% endif %}
+</section>
+{% endblock %}

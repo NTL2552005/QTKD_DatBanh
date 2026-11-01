@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% load catalog_format %}
+
+{% block title %}Duyệt chỉnh sửa {{ order.code }} — BiBi Cake{% endblock %}
+
+{% block content %}
+<section class="management-page page-shell">
+    <a class="back-link" href="{% url 'orders:owner_approval_list' %}">← Danh sách chờ duyệt</a>
+    <div class="order-detail-heading">
+        <div><span class="eyebrow">CHỦ CỬA HÀNG · DUYỆT PHẠM VI</span><h1>{{ order.code }}</h1></div>
+        <span class="status-pill status-order">{{ order.get_status_display }}</span>
+    </div>
+    <div class="order-content-grid">
+        <div class="order-main-column">
+            <section class="order-section">
+                <h2>Thỏa thuận đang có hiệu lực</h2>
+                {% if order.active_change_agreement %}
+                    <p>Phụ lục v{{ order.active_change_agreement.version_number }} · {{ order.active_change_agreement.quantity_snapshot }} × {{ order.active_change_agreement.unit_price|vnd }} + phí {{ order.active_change_agreement.delivery_fee|vnd }} · tổng {{ order.active_change_agreement.total|vnd }} · giao {{ order.active_change_agreement.proposed_delivery_at|date:"d/m/Y H:i" }}</p>
+                {% elif order.current_quote %}
+                    <p>Báo giá v{{ order.current_quote.version_number }} đã khách chấp nhận · {{ order.current_quote.quantity_snapshot }} × {{ order.current_quote.unit_price|vnd }} + phí {{ order.current_quote.delivery_fee|vnd }} · tổng {{ order.current_quote.total|vnd }} · giao {{ order.current_quote.proposed_delivery_at|date:"d/m/Y H:i" }}</p>
+                {% else %}
+                    <p class="field-error">Không tìm thấy báo giá đã chấp nhận làm căn cứ.</p>
+                {% endif %}
+                <dl class="order-data">
+                    <div><dt>Mẫu bánh</dt><dd>{{ order.cake_name_snapshot }}</dd></div>
+                    <div><dt>Kích thước · vị · số lượng</dt><dd>{{ order.size }} · {{ order.flavor }} · {{ order.quantity }}</dd></div>
+                    <div><dt>Trang trí đã thống nhất</dt><dd>{{ order.decoration_request|default:"Không có"|linebreaksbr }}</dd></div>
+                    <div><dt>Lịch giao mong muốn</dt><dd>{{ order.desired_delivery_at|date:"d/m/Y H:i" }}</dd></div>
+                </dl>
+            </section>
+            <section class="order-section">
+                <h2>Yêu cầu chỉnh sửa của khách</h2>
+                <p>{{ revision_request.message|linebreaksbr }}</p>
+                <p><strong>Ảnh được phản hồi:</strong> phiên bản {{ review.version_number }} · {{ review.get_status_display }}</p>
+                <img class="review-photo owner-review-photo" src="{{ review.private_image_url }}" alt="Ảnh bánh phiên bản {{ review.version_number }}">
+            </section>
+            <section class="order-section">
+                <h2>Đánh giá và phương án của nhân viên</h2>
+                <p><strong>Phân loại:</strong> {{ revision_request.get_scope_display }}</p>
+                <p><strong>Lý do vượt phạm vi:</strong> {{ approval.reason|linebreaksbr }}</p>
+                <p><strong>Tóm tắt:</strong> {{ approval.summary|linebreaksbr }}</p>
+                <p><strong>Phương án đề xuất:</strong> {{ approval.proposed_plan|linebreaksbr }}</p>
+                <p class="field-help">Chỉ nhân viên đánh giá phạm vi theo yêu cầu và báo giá đã chốt. Chủ duyệt không tự xác nhận thay khách.</p>
+            </section>
+        </div>
+        <aside class="order-side-column">
+            <section class="order-section action-card">
+                <h2>Quyết định của chủ cửa hàng</h2>
+                <form method="post" action="{% url 'orders:owner_decide_approval' approval.pk %}" class="form-stack compact-form" data-owner-approval>
+                    {% csrf_token %}{{ form.expected_version }}{{ form.expected_approval_id }}
+                    {% for field in form %}
+                        {% if field.name != "expected_version" and field.name != "expected_approval_id" %}
+                            <div class="form-field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.help_text %}<div class="field-help">{{ field.help_text }}</div>{% endif %}{% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}</div>
+                        {% endif %}
+                    {% endfor %}
+                    <p class="field-help">Nếu giá hoặc lịch cần thay đổi, hãy chọn phụ lục và nhập đủ điều kiện mới. Phụ lục chỉ có hiệu lực sau khi khách đồng ý.</p>
+                    <button class="button button-primary" type="submit" data-submit-once>Ghi nhận quyết định</button>
+                </form>
+            </section>
+            <section class="order-section">
+                <h2>Lịch sử liên quan</h2>
+                <ol class="timeline">{% for entry in history %}<li><span class="timeline-dot"></span><div><div class="timeline-heading"><strong>{{ entry.get_action_display }}</strong><time>{{ entry.occurred_at|date:"d/m/Y H:i" }}</time></div><p>{{ entry.actor.get_full_name|default:entry.actor.username }}</p>{% if entry.message %}<div class="timeline-message">{{ entry.message|linebreaksbr }}</div>{% endif %}</div></li>{% endfor %}</ol>
+            </section>
+        </aside>
+    </div>
+</section>
+{% endblock %}

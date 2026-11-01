@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% load catalog_format %}
+
+{% block title %}Duyệt phương án tiếp nhận — BiBi Cake{% endblock %}
+
+{% block content %}
+<section class="management-page page-shell">
+    <a class="back-link" href="{% url 'orders:owner_approval_list' %}">← Danh sách chờ duyệt</a>
+    <div class="order-detail-heading">
+        <div><span class="eyebrow">CHỦ CỬA HÀNG · DUYỆT PHƯƠNG ÁN TIẾP NHẬN</span><h1>{{ order.code }} · phương án v{{ alternative.version_number }}</h1></div>
+        <span class="status-pill status-order">{{ alternative.get_status_display }}</span>
+    </div>
+    <div class="order-content-grid">
+        <div class="order-main-column">
+            <section class="order-section">
+                <h2>Kết quả kiểm tra hiện hành</h2>
+                <p><strong>{{ alternative.availability_check.get_reason_display }}</strong>{% if alternative.availability_check.reason_details %} — {{ alternative.availability_check.reason_details }}{% endif %}</p>
+                <p>{{ alternative.availability_check.notes|linebreaksbr }}</p>
+                <p class="field-help">Kiểm tra bởi {{ alternative.availability_check.checked_by.get_full_name|default:alternative.availability_check.checked_by.username }} · {{ alternative.availability_check.checked_at|date:"d/m/Y H:i" }} · yêu cầu v{{ alternative.base_request_revision }}</p>
+            </section>
+            <section class="order-section">
+                <h2>Yêu cầu ban đầu</h2>
+                <p>{{ alternative.request_before.cake_name_snapshot }} · {{ alternative.request_before.size }} · {{ alternative.request_before.flavor }} · {{ alternative.request_before.quantity }} chiếc</p>
+                <p>{{ alternative.request_before.decoration_request|default:"Không có yêu cầu trang trí"|linebreaksbr }}</p>
+                <p>Giao: {{ alternative.request_before.desired_delivery_at }}</p>
+            </section>
+            <section class="order-section">
+                <h2>Phương án nhân viên đề xuất</h2>
+                <p><strong>Giải thích:</strong> {{ alternative.difference_summary|linebreaksbr }}</p>
+                <p><strong>Mẫu:</strong> {{ alternative.cake_name_snapshot }} · {{ alternative.size }} · {{ alternative.flavor }} · {{ alternative.quantity }} chiếc</p>
+                <p><strong>Nội dung trên bánh:</strong> {{ alternative.inscription|default:"Không có" }}</p>
+                <p><strong>Trang trí:</strong> {{ alternative.decoration_request|default:"Không có"|linebreaksbr }}</p>
+                <p><strong>Thời gian giao:</strong> {{ alternative.desired_delivery_at|date:"d/m/Y H:i" }}</p>
+                {% if alternative.estimated_unit_price != None %}<p><strong>Giá dự kiến:</strong> {{ alternative.estimated_unit_price|vnd }} / chiếc. Đây chưa phải báo giá chốt.</p>{% endif %}
+                {% if alternative.changed_fields %}
+                    <h3>Các trường thay đổi</h3>
+                    <ul class="change-list">{% for change in alternative.changed_fields %}<li>{{ change.label }}: “{{ change.before|default:"—" }}” → “{{ change.after|default:"—" }}”</li>{% endfor %}</ul>
+                {% endif %}
+                <p class="field-help">Duyệt chỉ cho phép STAFF gửi đúng phương án này để khách phản hồi. Chủ duyệt không tự gửi cho khách, xác nhận đơn hoặc chấp nhận giá.</p>
+            </section>
+        </div>
+        <aside class="order-side-column">
+            <section class="order-section action-card">
+                <h2>Quyết định của OWNER</h2>
+                <form method="post" action="{% url 'orders:owner_decide_intake_alternative' alternative.pk %}" class="form-stack compact-form">
+                    {% csrf_token %}{{ form.expected_order_version }}{{ form.expected_alternative_revision }}
+                    {% for field in form %}{% if not field.is_hidden %}<div class="form-field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}</div>{% endif %}{% endfor %}
+                    <button class="button button-primary" type="submit" data-submit-once>Ghi nhận quyết định</button>
+                </form>
+            </section>
+        </aside>
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% load catalog_format %}
+
+{% block title %}Duyệt sự cố {{ order.code }} — BiBi Cake{% endblock %}
+
+{% block content %}
+<section class="management-page page-shell">
+    <a class="back-link" href="{% url 'orders:owner_incident_list' %}">← Danh sách sự cố</a>
+    <div class="order-detail-heading">
+        <div><span class="eyebrow">CHỦ CỬA HÀNG · DUYỆT SỰ CỐ</span><h1>{{ order.code }}</h1></div>
+        <span class="status-pill status-order">{{ order.get_status_display }}</span>
+    </div>
+    <div class="order-content-grid">
+        <div class="order-main-column">
+            <section class="order-section">
+                <h2>Thông tin sự cố</h2>
+                <p><strong>{{ incident.get_incident_type_display }}</strong> · Người báo: {{ incident.reported_by.get_full_name|default:incident.reported_by.username }}</p>
+                <div class="timeline-message">{{ incident.description|linebreaksbr }}</div>
+                {% if incident_evidence_url %}<img class="review-photo" src="{{ incident_evidence_url }}" alt="Minh chứng sự cố riêng tư">{% endif %}
+            </section>
+            <section class="order-section">
+                <h2>Thỏa thuận và ảnh bánh đã duyệt</h2>
+                {% if order.active_change_agreement %}
+                    <p>Phụ lục v{{ order.active_change_agreement.version_number }} · tổng {{ order.active_change_agreement.total|vnd }} · giao {{ order.active_change_agreement.proposed_delivery_at|date:"d/m/Y H:i" }} · khách đã đồng ý.</p>
+                {% elif order.current_quote %}
+                    <p>Báo giá v{{ order.current_quote.version_number }} · tổng {{ order.current_quote.total|vnd }} · giao {{ order.current_quote.proposed_delivery_at|date:"d/m/Y H:i" }} · {{ order.current_quote.get_status_display }}.</p>
+                {% endif %}
+                <p>{{ order.cake_name_snapshot }} · {{ order.size }} · {{ order.flavor }} · số lượng {{ order.quantity }}</p>
+                <p>Yêu cầu trang trí: {{ order.decoration_request|default:"Không có"|linebreaksbr }}</p>
+                {% if review and review.status == "ACCEPTED" %}
+                    <p>Ảnh được khách chấp nhận · phiên bản {{ review.version_number }} · vòng sản xuất {{ review.production_round }}.</p>
+                    <img class="review-photo" src="{{ review_image_url }}" alt="Ảnh bánh khách đã duyệt">
+                {% else %}<p class="field-error">Không tìm thấy ảnh hiện hành đã được khách duyệt.</p>{% endif %}
+            </section>
+            <section class="order-section">
+                <h2>Lịch sử các lần giao</h2>
+                {% if delivery_attempts %}
+                    <ol class="timeline">{% for attempt in delivery_attempts %}
+                        <li><span class="timeline-dot"></span><div>
+                            <div class="timeline-heading"><strong>Lần {{ attempt.attempt_number }} · {{ attempt.get_result_display }}</strong><time>{{ attempt.started_at|date:"d/m/Y H:i" }}</time></div>
+                            <p>{{ attempt.recipient_name_snapshot }} · {{ attempt.recipient_phone_snapshot }}</p>
+                            <p>{{ attempt.delivery_address_snapshot }}</p>
+                            {% if attempt.failure_reason %}<p>{{ attempt.failure_reason|linebreaksbr }}</p>{% endif %}
+                            {% if attempt.confirmation_note %}<p>{{ attempt.confirmation_note|linebreaksbr }}</p>{% endif %}
+                            {% if attempt.proof %}<a href="{% url 'orders:private_order_evidence' 'delivery' attempt.pk %}">Mở minh chứng lần giao</a>{% endif %}
+                        </div></li>
+                    {% endfor %}</ol>
+                {% else %}<p>Chưa có lần giao.</p>{% endif %}
+            </section>
+        </div>
+        <aside class="order-side-column">
+            <section class="order-section">
+                <h2>Đối soát tiền</h2>
+                <dl class="order-data">
+                    <div><dt>Tổng phải thu</dt><dd>{{ financials.total|vnd }}</dd></div>
+                    <div><dt>Đã thu</dt><dd>{{ financials.received|vnd }}</dd></div>
+                    <div><dt>Đã hoàn</dt><dd>{{ financials.refunded|vnd }}</dd></div>
+                    <div><dt>Thu ròng</dt><dd>{{ financials.net_received|vnd }}</dd></div>
+                    <div><dt>Còn phải thu</dt><dd>{{ financials.remaining|vnd }}</dd></div>
+                </dl>
+                {% if payments %}
+                    <h3>Các khoản thu</h3>
+                    {% for payment in payments %}<p>{{ payment.amount|vnd }} · {{ payment.get_method_display }} · {{ payment.received_at|date:"d/m/Y H:i" }} · {{ payment.confirmed_by.get_full_name|default:payment.confirmed_by.username }}{% if payment.transaction_reference %} · {{ payment.transaction_reference }}{% endif %}</p>{% endfor %}
+                {% endif %}
+                {% if refunds %}
+                    <h3>Các khoản hoàn đã ghi nhận</h3>
+                    {% for refund in refunds %}
+                        <p>{{ refund.amount|vnd }} · {{ refund.get_method_display }} · {{ refund.refunded_at|date:"d/m/Y H:i" }} · {{ refund.recorded_by.get_full_name|default:refund.recorded_by.username }}{% if refund.transaction_reference %} · {{ refund.transaction_reference }}{% endif %}{% if refund.proof %} · <a href="{% url 'orders:private_order_evidence' 'refund' refund.pk %}">Minh chứng riêng tư</a>{% endif %}</p>
+                    {% endfor %}
+                {% endif %}
+                <p class="field-help">Chuyển khoản được nhân viên đối chiếu thủ công; hệ thống không kết nối ngân hàng.</p>
+            </section>
+            <section class="order-section action-card">
+                <h2>Quyết định phương án</h2>
+                <p><strong>{{ incident.get_proposed_resolution_display }}</strong></p>
+                <div class="timeline-message">{{ incident.proposed_plan|linebreaksbr }}</div>
+                <p class="field-help">Phương án sự cố không tự thay đổi giá, địa chỉ hoặc lịch đã chốt. Mọi thay đổi điều khoản cần phụ lục được OWNER duyệt và khách chủ động chấp nhận trước khi áp dụng.</p>
+                {% if incident.customer_agreement_note %}<p><strong>Thỏa thuận khách:</strong> {{ incident.customer_agreement_note|linebreaksbr }}</p>{% endif %}
+                {% if incident.proposed_delivery_at %}<p>Lịch giao đề xuất: {{ incident.proposed_delivery_at|date:"d/m/Y H:i" }}</p>{% endif %}
+                {% if incident.proposed_resolution == "CANCEL" %}
+                    <p>Số tiền cần hoàn nếu hủy: <strong>{{ incident.approved_refund_amount|vnd }}</strong>. Nếu đã thu tiền, đơn chỉ được hủy sau khi nhân viên ghi nhận hoàn đủ.</p>
+                {% endif %}
+                {% if incident.status == "PENDING_OWNER" %}
+                    <form method="post" action="{% url 'orders:owner_decide_incident' incident.pk %}" class="form-stack compact-form">
+                        {% csrf_token %}
+                        {% for field in decision_form %}
+                            {% if field.is_hidden %}{{ field }}{% else %}
+                                <div class="form-field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}</div>
+                            {% endif %}
+                        {% endfor %}
+                        <button class="button button-primary" type="submit" data-submit-once>Ghi nhận quyết định</button>
+                    </form>
+                {% else %}
+                    <p>Quyết định: <strong>{{ incident.get_owner_decision_display }}</strong> · {{ incident.decision_reason|linebreaksbr }}</p>
+                {% endif %}
+            </section>
+        </aside>
+    </div>
+</section>
+{% endblock %}

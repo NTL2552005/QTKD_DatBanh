@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% load catalog_format %}
+{% load static %}
+
+{% block title %}Tiếp nhận {{ order.code }} — BiBi Cake{% endblock %}
+
+{% block content %}
+<section class="management-page page-shell">
+    <a class="back-link" href="{% url 'orders:owner_intake_order_list' %}">← Hàng đợi tiếp nhận</a>
+    <div class="order-detail-heading">
+        <div><span class="eyebrow">CHỦ CỬA HÀNG XỬ LÝ TIẾP NHẬN</span><h1>{{ order.code }}</h1></div>
+        <span class="status-pill status-order">{{ order.get_status_display }}</span>
+    </div>
+
+    {% if can_claim_legacy %}
+        <section class="order-section action-card">
+            <h2>Dữ liệu đang chờ theo quy trình cũ</h2>
+            <p>Đơn này được chuyển chờ OWNER theo quy trình trước. Hệ thống không tự chuyển dữ liệu hoặc phê duyệt cũ. Hãy xem yêu cầu và chủ động nhận tiếp quản để dùng luồng mới.</p>
+            {% if legacy_approval %}
+                <p><strong>Lý do STAFF đã ghi:</strong> {{ legacy_approval.authority_details|linebreaksbr }}</p>
+                <p><strong>Snapshot báo giá cũ, chỉ để tham khảo:</strong> {{ legacy_approval.quote_snapshot }}</p>
+            {% endif %}
+            <form method="post" action="{% url 'orders:owner_claim_intake_order' order.pk %}">
+                {% csrf_token %}{{ claim_form.expected_order_version }}
+                <button class="button button-primary" type="submit" data-submit-once>Nhận tiếp quản đơn này</button>
+            </form>
+        </section>
+    {% endif %}
+
+    <div class="order-content-grid">
+        <div class="order-main-column">
+            <section class="order-section">
+                <h2>Yêu cầu khách hàng</h2>
+                <p><strong>Khách:</strong> {{ order.customer.get_full_name|default:order.customer.username }}</p>
+                <p><strong>Gửi lúc:</strong> {{ order.created_at|date:"d/m/Y H:i" }} · <strong>Yêu cầu phiên bản:</strong> v{{ order.request_revision }}</p>
+                <dl class="order-data">
+                    <div><dt>Mẫu bánh</dt><dd>{{ order.cake_name_snapshot }}</dd></div>
+                    <div><dt>Kích thước · hương vị</dt><dd>{{ order.size }} · {{ order.flavor }}</dd></div>
+                    <div><dt>Số lượng</dt><dd>{{ order.quantity }}</dd></div>
+                    <div><dt>Nội dung trên bánh</dt><dd>{{ order.inscription|default:"Chưa ghi" }}</dd></div>
+                    <div><dt>Trang trí/phụ kiện</dt><dd>{{ order.decoration_request|default:"Chưa ghi"|linebreaksbr }}</dd></div>
+                    <div><dt>Giao mong muốn</dt><dd>{{ order.desired_delivery_at|date:"d/m/Y H:i" }}</dd></div>
+                    <div><dt>Người nhận</dt><dd>{{ order.recipient_name }} · {{ order.recipient_phone }}</dd></div>
+                    <div><dt>Địa chỉ giao</dt><dd>{{ order.delivery_address }}</dd></div>
+                    <div><dt>Ghi chú khách</dt><dd>{{ order.note|default:"Không có"|linebreaksbr }}</dd></div>
+                </dl>
+                {% if staff_check %}
+                    <div class="approval-summary">
+                        <strong>Phân loại của STAFF · yêu cầu v{{ staff_check.request_revision }}</strong>
+                        <p>{{ staff_check.get_authority_classification_display }}</p>
+                        {% if staff_check.authority_reasons %}<p>Lý do: {{ staff_check.authority_reasons|join:", " }}</p>{% endif %}
+                        {% if staff_check.authority_details %}<p>{{ staff_check.authority_details|linebreaksbr }}</p>{% endif %}
+                        {% if transfer_history and transfer_history.details.internal_note %}<p>Ghi chú nội bộ khi chuyển: {{ transfer_history.details.internal_note|linebreaksbr }}</p>{% endif %}
+                        {% if transfer_history %}<p>Chuyển bởi {{ transfer_history.actor.get_full_name|default:transfer_history.actor.username }} · {{ transfer_history.occurred_at|date:"d/m/Y H:i" }}</p>{% endif %}
+                    </div>
+                {% endif %}
+            </section>
+
+            {% if can_owner_process %}
+                <section class="order-section action-card">
+                    <h2>Kiểm tra khả năng tiếp nhận</h2>
+                    {% if owner_intake_check %}
+                        <p>Kết quả gần nhất cho yêu cầu v{{ owner_intake_check.request_revision }}:
+                            nguyên liệu {% if owner_intake_check.materials_available %}đáp ứng{% else %}không đáp ứng{% endif %},
+                            thời gian {% if owner_intake_check.schedule_available %}đáp ứng{% else %}không đáp ứng{% endif %}.
+                        </p>
+                        <p>{{ owner_intake_check.notes|linebreaksbr }}</p>
+                        <p class="field-help">Kiểm tra bởi {{ owner_intake_check.checked_by.get_full_name|default:owner_intake_check.checked_by.username }} · {{ owner_intake_check.checked_at|date:"d/m/Y H:i" }}</p>
+                    {% else %}
+                        <p>Chủ cửa hàng tự kiểm tra nguyên liệu và khả năng làm/giao trước khi quyết định.</p>
+                    {% endif %}
+                    <form method="post" action="{% url 'orders:owner_check_intake_order' order.pk %}" class="form-stack compact-form">
+                        {% csrf_token %}{{ owner_check_form.expected_order_version }}
+                        {% for field in owner_check_form %}{% if not field.is_hidden %}
+                            <div class="form-field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.help_text %}<div class="field-help">{{ field.help_text }}</div>{% endif %}{% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}</div>
+                        {% endif %}{% endfor %}
+                        <button class="button button-outline" type="submit" data-submit-once>Ghi nhận kiểm tra</button>
+                    </form>
+                </section>
+
+                {% if owner_intake_check and owner_intake_check.is_fully_available and quote_can_send %}
+                    <section class="order-section action-card">
+                        <h2>Nhận đơn và gửi báo giá</h2>
+                        <p>Chủ cửa hàng lập báo giá trực tiếp cho khách. Gửi báo giá chưa xác nhận đơn; khách đồng ý báo giá hiện hành mới xác nhận.</p>
+                        <form method="post" action="{% url 'orders:owner_send_intake_quote' order.pk %}" class="form-stack compact-form" data-quote-form data-quantity="{{ order.quantity }}">
+                            {% csrf_token %}{{ quote_form.expected_version }}
+                            {% for field in quote_form %}{% if field.name != "expected_version" %}
+                                <div class="form-field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.help_text %}<div class="field-help">{{ field.help_text }}</div>{% endif %}{% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}</div>
+                            {% endif %}{% endfor %}
+                            <div class="quote-preview">Thành tiền bánh: <strong data-cake-total>0 đ</strong><br>Tổng tiền: <strong data-quote-total>0 đ</strong></div>
+                            <button class="button button-primary" type="submit" data-submit-once>Gửi báo giá trực tiếp cho khách</button>
+                        </form>
+                    </section>
+                {% elif owner_intake_check and not owner_intake_check.is_fully_available %}
+                    <div class="message message-warning">Kết quả kiểm tra chưa đáp ứng. Không thể gửi báo giá cho yêu cầu này; hãy từ chối tiếp nhận với lý do dành cho khách.</div>
+                {% endif %}
+
+                {% if owner_intake_check %}
+                    <section class="order-section action-card">
+                        <h2>Từ chối tiếp nhận</h2>
+                        <p>Đơn sẽ kết thúc ở trạng thái từ chối. Lý do dành cho khách sẽ hiển thị ngay trong chi tiết đơn; không cần STAFF thông báo lại.</p>
+                        <form method="post" action="{% url 'orders:owner_reject_intake_order' order.pk %}" class="form-stack compact-form">
+                            {% csrf_token %}{{ rejection_form.expected_order_version }}
+                            {% for field in rejection_form %}{% if not field.is_hidden %}
+                                <div class="form-field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.help_text %}<div class="field-help">{{ field.help_text }}</div>{% endif %}{% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}</div>
+                            {% endif %}{% endfor %}
+                            <button class="button button-outline" type="submit" data-submit-once>Từ chối tiếp nhận và thông báo khách</button>
+                        </form>
+                    </section>
+                {% endif %}
+            {% endif %}
+
+            {% if history %}
+                <section class="order-section history-section">
+                    <h2>Lịch sử xử lý</h2>
+                    <ol class="timeline">{% for entry in history %}
+                        <li><span class="timeline-dot"></span><div>
+                            <div class="timeline-heading"><strong>{{ entry.get_action_display }}</strong><time>{{ entry.occurred_at|date:"d/m/Y H:i" }}</time></div>
+                            <p>{{ entry.actor.get_full_name|default:entry.actor.username }}</p>
+                            {% if entry.message %}<div class="timeline-message">{{ entry.message|linebreaksbr }}</div>{% endif %}
+                        </div></li>
+                    {% endfor %}</ol>
+                </section>
+            {% endif %}
+        </div>
+        <aside class="order-side-column">
+            <section class="order-section quote-section">
+                <h2>Các báo giá</h2>
+                {% for quote in quotes %}
+                    <article class="quote-card">
+                        <div class="quote-card-heading"><h3>Phiên bản {{ quote.version_number }}</h3><span class="status-pill status-order">{{ quote.get_status_display }}</span></div>
+                        <p>{{ quote.quantity_snapshot }} × {{ quote.unit_price|vnd }} + phí giao {{ quote.delivery_fee|vnd }} = <strong>{{ quote.total|vnd }}</strong></p>
+                        <p>Giao {{ quote.proposed_delivery_at|date:"d/m/Y H:i" }} · hạn {{ quote.expires_at|date:"d/m/Y H:i" }}</p>
+                        {% if quote.notes %}<p>{{ quote.notes|linebreaksbr }}</p>{% endif %}
+                        <p class="field-help">Lập bởi {{ quote.created_by.get_full_name|default:quote.created_by.username }} · {{ quote.sent_at|date:"d/m/Y H:i" }}</p>
+                    </article>
+                {% empty %}
+                    <p class="muted">Chưa có báo giá.</p>
+                {% endfor %}
+                {% if order.rejection_reason %}<div class="message message-warning"><strong>Lý do từ chối dành cho khách</strong><p>{{ order.rejection_reason|linebreaksbr }}</p></div>{% endif %}
+            </section>
+        </aside>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/quote-preview.js' %}" defer></script>
+{% endblock %}

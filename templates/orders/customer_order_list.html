@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Đơn của tôi — BiBi Cake{% endblock %}
+
+{% block content %}
+<section class="management-page page-shell">
+    <div class="management-heading">
+        <div><span class="eyebrow">KHU VỰC KHÁCH HÀNG</span><h1>Đơn của tôi</h1><p>Theo dõi yêu cầu và phản hồi báo giá từ cửa hàng.</p></div>
+        <a class="button button-primary" href="{% url 'catalog:cake_list' %}">Xem mẫu bánh</a>
+    </div>
+    <form method="get" class="filter-panel order-filter">
+        <div class="filter-field"><label for="order-search">Mã đơn</label><input id="order-search" name="q" value="{{ search_query }}" placeholder="BBC-..."></div>
+        <div class="filter-field"><label for="order-status">Trạng thái</label><select id="order-status" name="status"><option value="">Tất cả</option>{% for value,label in statuses %}<option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+        <button class="button button-outline" type="submit">Lọc đơn</button>
+    </form>
+    {% if page_obj.object_list %}
+        <div class="table-wrap">
+            <table class="management-table">
+                <thead><tr><th>Mã đơn</th><th>Mẫu bánh</th><th>Số lượng</th><th>Ngày giao mong muốn</th><th>Trạng thái</th><th>Báo giá</th><th>Đánh giá</th><th></th></tr></thead>
+                <tbody>{% for order in page_obj %}
+                    <tr>
+                        <td><strong>{{ order.code }}</strong><small>{{ order.created_at|date:"d/m/Y H:i" }}</small></td>
+                        <td>{{ order.cake_name_snapshot }}</td>
+                        <td>{{ order.quantity }}</td>
+                        <td>{{ order.desired_delivery_at|date:"d/m/Y H:i" }}</td>
+                        <td><span class="status-pill status-order">{{ order.get_status_display }}</span></td>
+                        <td>{% if order.current_quote %}v{{ order.current_quote.version_number }} · {{ order.current_quote.display_status }}{% else %}—{% endif %}</td>
+                        <td>
+                            {% if order.customer_review_state == "submitted" %}<span class="review-state">Đã đánh giá</span>
+                            {% elif order.customer_review_state == "available" %}<span class="review-state review-state-available">Có thể đánh giá</span>
+                            {% elif order.customer_review_state == "time_unknown" %}<span class="review-state">Cần kiểm tra mốc</span>
+                            {% else %}—{% endif %}
+                        </td>
+                        <td><a class="text-link" href="{% url 'orders:order_detail' order.pk %}">Chi tiết</a></td>
+                    </tr>
+                {% endfor %}</tbody>
+            </table>
+        </div>
+        {% include "orders/partials/pagination.html" %}
+    {% else %}
+        <div class="empty-state"><span aria-hidden="true">✿</span><h2>Bạn chưa có đơn hàng</h2><p>Chọn một mẫu bánh để gửi yêu cầu đầu tiên.</p><a class="button button-primary" href="{% url 'catalog:cake_list' %}">Khám phá mẫu bánh</a></div>
+    {% endif %}
+</section>
+{% endblock %}

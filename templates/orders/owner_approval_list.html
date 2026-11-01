@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}Duyệt chỉnh sửa — BiBi Cake{% endblock %}
+
+{% block content %}
+<section class="management-page page-shell">
+    <div class="management-heading">
+        <div><span class="eyebrow">KHU VỰC CHỦ CỬA HÀNG</span><h1>Yêu cầu chỉnh sửa chờ duyệt</h1><p>Chỉ duyệt phạm vi và phương án; khách vẫn phải đồng ý nếu thay đổi giá hoặc lịch.</p></div>
+    </div>
+    {% if page_obj.object_list or intake_alternatives %}
+        {% if intake_alternatives %}
+            <section class="order-section">
+                <h2>Phương án thay thế tại giai đoạn tiếp nhận</h2>
+                <p>Chủ cửa hàng duyệt phạm vi phương án; quyết định này không gửi phương án cho khách và không xác nhận đơn.</p>
+                <div class="table-wrap">
+                    <table class="management-table">
+                        <thead><tr><th>Đơn</th><th>Phương án</th><th>Nguyên nhân</th><th>Nhân viên</th><th></th></tr></thead>
+                        <tbody>
+                            {% for alternative in intake_alternatives %}
+                                <tr>
+                                    <td><strong>{{ alternative.order.code }}</strong><small>Khách: {{ alternative.order.customer.username }}</small></td>
+                                    <td>v{{ alternative.version_number }} · {{ alternative.cake_name_snapshot }} · {{ alternative.size }} · {{ alternative.flavor }}</td>
+                                    <td>{{ alternative.availability_check.get_reason_display }}<small>{{ alternative.difference_summary|truncatechars:140 }}</small></td>
+                                    <td>{{ alternative.created_by.get_full_name|default:alternative.created_by.username }}</td>
+                                    <td><a class="text-link" href="{% url 'orders:owner_intake_alternative_detail' alternative.pk %}">Xem và quyết định</a></td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        {% endif %}
+        {% if page_obj.object_list %}
+        <section class="order-section">
+            <h2>Yêu cầu chỉnh sửa trong sản xuất</h2>
+        <div class="table-wrap">
+            <table class="management-table">
+                <thead><tr><th>Đơn</th><th>Yêu cầu của khách</th><th>Phân loại nhân viên</th><th>Phương án</th><th>Người gửi</th><th></th></tr></thead>
+                <tbody>
+                    {% for approval in page_obj %}
+                        <tr>
+                            <td><strong>{{ approval.revision_request.order.code }}</strong><small>Ảnh v{{ approval.revision_request.review_version.version_number }}</small></td>
+                            <td>{{ approval.revision_request.message|truncatechars:120 }}</td>
+                            <td>{{ approval.reason|truncatechars:120 }}</td>
+                            <td>{{ approval.proposed_plan|truncatechars:120 }}</td>
+                            <td>{{ approval.submitted_by.get_full_name|default:approval.submitted_by.username }}</td>
+                            <td><a class="text-link" href="{% url 'orders:owner_approval_detail' approval.pk %}">Xem và quyết định</a></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% include "orders/partials/pagination.html" %}
+        </section>
+        {% endif %}
+    {% else %}
+        <div class="empty-state"><span aria-hidden="true">✿</span><h2>Không có yêu cầu chờ duyệt</h2><p>Yêu cầu chỉnh sửa trong sản xuất hoặc phương án thay thế cần chủ duyệt sẽ hiển thị tại đây. Đơn tiếp nhận chủ xử lý ở hàng đợi riêng.</p></div>
+    {% endif %}
+</section>
+{% endblock %}

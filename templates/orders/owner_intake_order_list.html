@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}Tiếp nhận đơn — BiBi Cake{% endblock %}
+
+{% block content %}
+<section class="management-page page-shell">
+    <div class="management-heading">
+        <div>
+            <span class="eyebrow">KHU VỰC CHỦ CỬA HÀNG</span>
+            <h1>Đơn tiếp nhận chủ xử lý</h1>
+            <p>Chủ cửa hàng kiểm tra khả năng nhận đơn và trực tiếp gửi báo giá hoặc từ chối tiếp nhận.</p>
+        </div>
+    </div>
+    <form method="get" class="filter-panel">
+        <div class="filter-field">
+            <label for="intake-search">Tìm đơn</label>
+            <input id="intake-search" type="search" name="q" value="{{ search_query }}" placeholder="Mã đơn, mẫu bánh hoặc tài khoản khách">
+        </div>
+        <div class="filter-field">
+            <label for="intake-status">Trạng thái</label>
+            <select id="intake-status" name="status">
+                <option value="">Tất cả</option>
+                {% for value, label in statuses %}
+                    <option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button class="button button-outline" type="submit">Lọc đơn</button>
+    </form>
+
+    {% if page_obj.object_list %}
+        <div class="table-wrap">
+            <table class="management-table">
+                <thead>
+                    <tr><th>Đơn và nhu cầu</th><th>Thời gian mong muốn</th><th>Lý do chuyển</th><th>Người chuyển</th><th>Trạng thái</th><th></th></tr>
+                </thead>
+                <tbody>
+                    {% for order in page_obj %}
+                        <tr>
+                            <td>
+                                <strong>{{ order.code }}</strong>
+                                <small>{{ order.cake_name_snapshot }} · {{ order.size }} · {{ order.flavor }} · {{ order.quantity }} chiếc</small>
+                            </td>
+                            <td>{{ order.desired_delivery_at|date:"d/m/Y H:i" }}</td>
+                            <td>
+                                {% if order.current_staff_check %}
+                                    {{ order.current_staff_check.authority_details|default:"Đơn đang chờ chủ xử lý"|truncatechars:140 }}
+                                {% else %}
+                                    Đơn theo quy trình cũ, cần chủ tiếp quản rõ ràng.
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if order.transfer_history %}
+                                    {{ order.transfer_history.actor.get_full_name|default:order.transfer_history.actor.username }}
+                                    <small>{{ order.transfer_history.occurred_at|date:"d/m/Y H:i" }}</small>
+                                {% else %}
+                                    <small>Chưa có dấu vết chuyển theo luồng mới</small>
+                                {% endif %}
+                            </td>
+                            <td><span class="status-pill status-order">{{ order.get_status_display }}</span></td>
+                            <td><a class="text-link" href="{% url 'orders:owner_intake_order_detail' order.pk %}">Mở đơn</a></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% include "orders/partials/pagination.html" %}
+    {% else %}
+        <div class="empty-state"><span aria-hidden="true">✿</span><h2>Chưa có đơn chờ chủ xử lý</h2><p>Đơn được nhân viên chuyển hoặc dữ liệu đang chờ xử lý theo quy trình cũ sẽ xuất hiện tại đây.</p></div>
+    {% endif %}
+</section>
+{% endblock %}

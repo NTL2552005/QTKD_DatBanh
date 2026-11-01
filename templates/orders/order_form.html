@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% load catalog_format %}
+
+{% block title %}{{ page_title }} — BiBi Cake{% endblock %}
+
+{% block content %}
+<section class="management-page page-shell">
+    <a class="back-link" href="{% url 'catalog:cake_detail' cake.slug %}">← Quay lại mẫu bánh</a>
+    <div class="order-form-layout">
+        <aside class="order-summary-card">
+            <span class="eyebrow">MẪU BÁNH ĐÃ CHỌN</span>
+            {% if cake.image %}<img src="{{ cake.image.url }}" alt="Mẫu {{ cake.name }}">{% else %}<img src="/static/images/cake-placeholder.svg" alt="Ảnh minh họa mẫu bánh">{% endif %}
+            <span class="cake-category">{{ cake.category.name }}</span>
+            <h2>{{ cake.name }}</h2>
+            <p class="cake-price-label">Giá tham khảo</p>
+            <p class="cake-price">{{ cake.reference_price|vnd }}</p>
+            <p class="muted">Đây là yêu cầu ban đầu. Đơn chỉ được xác nhận sau khi bạn đồng ý báo giá của cửa hàng.</p>
+        </aside>
+        <div class="management-form-card order-form-card">
+            <span class="eyebrow">THÔNG TIN YÊU CẦU</span>
+            <h1>{{ page_title }}</h1>
+            <p class="muted">Nhân viên sẽ kiểm tra nguyên liệu và lịch làm trước khi gửi báo giá.</p>
+            <form method="post" class="form-stack">
+                {% csrf_token %}
+                {% if form.non_field_errors %}<div class="form-errors">{{ form.non_field_errors }}</div>{% endif %}
+                {{ form.request_key }}
+                {{ form.draft_id }}
+                {% for field in form %}
+                    {% if not field.is_hidden %}
+                        <div class="form-field">
+                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.help_text %}<div class="field-help">{{ field.help_text }}</div>{% endif %}
+                            {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+                        </div>
+                    {% endif %}
+                {% endfor %}
+                <button class="button button-primary button-full" type="submit" data-submit-once>Gửi yêu cầu</button>
+                <p class="field-help">Gửi yêu cầu chưa đồng nghĩa cửa hàng đã nhận đơn hoặc chốt giá.</p>
+            </form>
+        </div>
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Chi tiết đánh giá — BiBi Cake{% endblock %}
+
+{% block content %}
+<section class="order-detail-page page-shell">
+    <a class="back-link" href="{% url 'orders:owner_review_list' %}">← Danh sách đánh giá</a>
+    <div class="order-heading">
+        <div><span class="eyebrow">ĐÁNH GIÁ NỘI BỘ</span><h1>{{ order.code }}</h1></div>
+        <span class="status-pill status-order">{{ order.get_status_display }}</span>
+    </div>
+    <section class="order-section">
+        <h2>Thông tin đơn liên quan</h2>
+        <dl class="order-facts">
+            <div><dt>Khách hàng</dt><dd>{{ review.customer.get_full_name|default:review.customer.username }}</dd></div>
+            <div><dt>Mẫu bánh</dt><dd>{{ order.cake_name_snapshot }}</dd></div>
+            <div><dt>Hoàn tất lúc</dt><dd>{% if order.completed_at %}{{ order.completed_at|date:"d/m/Y H:i" }}{% else %}Chưa ghi nhận{% endif %}</dd></div>
+        </dl>
+        <h2>Đánh giá của khách</h2>
+        <p><strong>{{ review.rating }}/5 sao</strong> · {{ review.created_at|date:"d/m/Y H:i" }}</p>
+        <div class="review-comment">{{ review.comment|default:"Khách không để lại nhận xét."|linebreaksbr }}</div>
+    </section>
+    <section class="order-section">
+        <h2>Phản hồi của cửa hàng</h2>
+        {% if review.reply %}
+            <div class="review-reply">
+                <strong>{{ review.reply.owner.get_full_name|default:review.reply.owner.username }}</strong>
+                <small>{{ review.reply.created_at|date:"d/m/Y H:i" }}</small>
+                <p>{{ review.reply.content|linebreaksbr }}</p>
+            </div>
+        {% else %}
+            <p>Chỉ OWNER có thể gửi một phản hồi. Sau khi gửi, nội dung không thể sửa hoặc xóa.</p>
+            <form method="post" action="{% url 'orders:owner_reply_to_review' review.pk %}" class="form-stack">
+                {% csrf_token %}
+                <div class="form-field">
+                    <label for="{{ reply_form.content.id_for_label }}">{{ reply_form.content.label }}</label>
+                    {{ reply_form.content }}
+                    {% for error in reply_form.content.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+                </div>
+                {% for error in reply_form.non_field_errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+                <button class="button button-primary" type="submit" data-submit-once>Gửi phản hồi</button>
+            </form>
+        {% endif %}
+    </section>
+    <section class="order-section history-section">
+        <h2>Lịch sử liên quan</h2>
+        {% if order_history %}
+            <ol class="timeline">
+                {% for entry in order_history %}
+                    <li><strong>{{ entry.get_action_display }}</strong><small>{{ entry.occurred_at|date:"d/m/Y H:i" }} · {% if entry.actor %}{{ entry.actor.get_full_name|default:entry.actor.username }}{% else %}Hệ thống{% endif %}</small><p>{{ entry.message }}</p></li>
+                {% endfor %}
+            </ol>
+        {% else %}
+            <p>Chưa có lịch sử để hiển thị.</p>
+        {% endif %}
+    </section>
+</section>
+{% endblock %}
