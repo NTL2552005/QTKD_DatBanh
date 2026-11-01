@@ -1,0 +1,76 @@
+{% load static %}
+<!doctype html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#fff8f2">
+    <title>{% block title %}BiBi Cake{% endblock %}</title>
+    <link rel="icon" type="image/svg+xml" href="{% static 'images/favicon.svg' %}">
+    <link rel="stylesheet" href="{% static 'css/site.css' %}">
+    {% block extra_styles %}{% endblock %}
+    <script src="{% static 'js/site.js' %}" defer></script>
+</head>
+<body>
+    <header class="site-header">
+        <nav class="nav-shell" aria-label="Điều hướng chính">
+            <a class="brand" href="{% url 'home' %}" aria-label="BiBi Cake - Trang chủ">
+                <span class="brand-mark" aria-hidden="true">B</span>
+                <span>BiBi <strong>Cake</strong></span>
+            </a>
+            <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav">
+                <span class="sr-only">Mở menu</span>
+                <span aria-hidden="true">☰</span>
+            </button>
+            <div class="nav-links" id="primary-nav">
+                <a href="{% url 'home' %}">Trang chủ</a>
+                <a href="{% url 'catalog:cake_list' %}">Mẫu bánh</a>
+                {% if user.is_authenticated %}
+                    {% if user.role == "CUSTOMER" %}
+                        <a href="{% url 'accounts:customer_dashboard' %}">Khu vực khách hàng</a>
+                        <a href="{% url 'orders:customer_order_list' %}">Đơn của tôi</a>
+                        <a href="{% url 'assistant:index' %}">Tư vấn AI</a>
+                    {% elif user.role == "STAFF" %}
+                        <a href="{% url 'accounts:staff_dashboard' %}">Khu vực nhân viên</a>
+                        <a href="{% url 'orders:staff_order_list' %}">Tiếp nhận đơn</a>
+                    {% elif user.role == "OWNER" %}
+                        <a href="{% url 'accounts:owner_dashboard' %}">Khu vực chủ cửa hàng</a>
+                        <a href="{% url 'orders:owner_intake_order_list' %}">Tiếp nhận đơn vượt quyền</a>
+                        <a href="{% url 'catalog:owner_category_list' %}">Quản lý danh mục</a>
+                        <a href="{% url 'catalog:owner_cake_list' %}">Quản lý mẫu bánh</a>
+                        <a href="{% url 'orders:owner_approval_list' %}">Duyệt chỉnh sửa</a>
+                        <a href="{% url 'orders:owner_incident_list' %}">Duyệt sự cố</a>
+                        <a href="{% url 'orders:owner_review_list' %}">Đánh giá khách hàng</a>
+                        <a href="{% url 'orders:owner_workflow_event_list' %}">Giám sát workflow</a>
+                        <a href="{% url 'assistant:owner_policy_list' %}">Chính sách chatbot</a>
+                    {% endif %}
+                    <span class="nav-greeting">{{ user.first_name|default:user.username }}</span>
+                    <form method="post" action="{% url 'accounts:logout' %}" class="logout-form">
+                        {% csrf_token %}
+                        <button class="button button-outline button-small" type="submit">Đăng xuất</button>
+                    </form>
+                {% else %}
+                    <a href="{% url 'accounts:login' %}">Đăng nhập</a>
+                    <a class="button button-primary button-small" href="{% url 'accounts:register' %}">Tạo tài khoản</a>
+                {% endif %}
+            </div>
+        </nav>
+    </header>
+
+    <main>
+        {% if messages %}
+            <div class="messages-shell" aria-live="polite">
+                {% for message in messages %}
+                    <div class="message message-{{ message.tags|default:'info' }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="site-footer">
+        <p>BiBi Cake <span aria-hidden="true">·</span> Ngọt ngào từ những điều giản dị</p>
+    </footer>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

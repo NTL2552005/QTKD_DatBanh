@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block title %}Không có quyền truy cập — BiBi Cake{% endblock %}
+
+{% block content %}
+<section class="error-page page-shell">
+    <div class="error-code">403</div>
+    <span class="eyebrow">KHU VỰC RIÊNG</span>
+    <h1>Bạn chưa có quyền truy cập</h1>
+    <p>Tài khoản hiện tại không được phép mở trang này. Hãy quay lại khu vực phù hợp với vai trò của bạn.</p>
+    <a class="button button-primary" href="{% url 'home' %}">Về trang chủ</a>
+</section>
+{% endblock %}
