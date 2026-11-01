@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}Giám sát workflow — BiBi Cake{% endblock %}
+
+{% block content %}
+<section class="management-page page-shell">
+    <div class="management-heading">
+        <div><span class="eyebrow">CHỈ DÀNH CHO OWNER</span><h1>Giám sát workflow</h1><p>“Workflow đã tiếp nhận” không xác nhận email đã tới hộp thư.</p></div>
+        <a class="button button-outline" href="{% url 'accounts:owner_dashboard' %}">Về dashboard</a>
+    </div>
+    <div class="workflow-counts" aria-label="Thống kê sự kiện">
+        <span>Chờ gửi: <strong>{{ event_counts.pending|default:0 }}</strong></span>
+        <span>Đang xử lý: <strong>{{ event_counts.processing|default:0 }}</strong></span>
+        <span>Workflow đã tiếp nhận: <strong>{{ event_counts.delivered|default:0 }}</strong></span>
+        <span>Thất bại: <strong>{{ event_counts.failed|default:0 }}</strong></span>
+    </div>
+    <form method="get" class="filter-panel workflow-filter">
+        <div class="filter-field"><label for="event-order">Mã đơn</label><input id="event-order" name="q" value="{{ search_query }}" placeholder="BBC-..."></div>
+        <div class="filter-field">
+            <label for="event-type">Loại sự kiện</label>
+            <select id="event-type" name="event_type">
+                <option value="">Tất cả</option>
+                {% for value,label in event_types %}<option value="{{ value }}" {% if selected_event_type == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="filter-field">
+            <label for="event-status">Trạng thái</label>
+            <select id="event-status" name="status">
+                <option value="">Tất cả</option>
+                {% for value,label in event_statuses %}<option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+            </select>
+        </div>
+        <button class="button button-outline" type="submit">Lọc sự kiện</button>
+    </form>
+    {% if page_obj.object_list %}
+        <div class="table-wrap">
+            <table class="management-table workflow-table">
+                <thead><tr><th>Sự kiện</th><th>Đơn</th><th>Trạng thái</th><th>Lần thử</th><th>Lần tiếp theo</th><th>Lỗi gần nhất</th><th>Thao tác</th></tr></thead>
+                <tbody>
+                    {% for event in page_obj %}
+                        <tr>
+                            <td><strong>{{ event.get_event_type_display }}</strong><small>{{ event.event_id }}</small></td>
+                            <td><strong>{{ event.order.code }}</strong><small>{{ event.created_at|date:"d/m/Y H:i" }}</small></td>
+                            <td>{{ event.get_status_display }}{% if event.delivered_at %}<small>Workflow tiếp nhận {{ event.delivered_at|date:"d/m/Y H:i" }}</small>{% endif %}</td>
+                            <td>{{ event.attempts }}</td>
+                            <td>{% if event.status == "pending" %}{{ event.next_attempt_at|date:"d/m/Y H:i:s" }}{% else %}—{% endif %}</td>
+                            <td>{{ event.last_error|default:"—" }}</td>
+                            <td>
+                                {% if event.can_retry %}
+                                    <form method="post" action="{% url 'orders:owner_retry_workflow_event' event.pk %}">
+                                        {% csrf_token %}
+                                        <button class="button button-outline button-small" type="submit">Xếp thử lại</button>
+                                    </form>
+                                {% elif event.status == "failed" and not event.payload.recipient_email %}
+                                    <span>Thiếu email; cần kiểm tra hồ sơ khách</span>
+                                {% else %}—{% endif %}
+                            </td>
+                        </tr>
+                        {% with retry=event.retry_requests.all|first %}
+                            {% if retry %}<tr class="workflow-audit-row"><td colspan="7">Lần thử lại gần nhất được xếp bởi {{ retry.requested_by.get_full_name|default:retry.requested_by.username }} lúc {{ retry.created_at|date:"d/m/Y H:i" }} ({{ retry.attempts_before_retry }} lần thử trước đó).</td></tr>{% endif %}
+                        {% endwith %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% include "orders/partials/pagination.html" %}
+    {% else %}
+        <div class="empty-state"><span aria-hidden="true">♡</span><h2>Chưa có sự kiện workflow</h2><p>Sự kiện phát sinh khi báo giá được xác nhận, ảnh được gửi duyệt hoặc đơn hoàn tất.</p></div>
+    {% endif %}
+</section>
+{% endblock %}
