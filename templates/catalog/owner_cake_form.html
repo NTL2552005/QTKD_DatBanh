@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% load catalog_format %}
+
+{% block title %}{{ page_title }} — BiBi Cake{% endblock %}
+
+{% block content %}
+<section class="management-page page-shell">
+    <a class="back-link" href="{% url 'catalog:owner_cake_list' %}">← Quay lại mẫu bánh</a>
+    <div class="management-form-card">
+        <span class="eyebrow">KHU VỰC CHỦ CỬA HÀNG</span>
+        <h1>{{ page_title }}</h1>
+        {% if cake and cake.image %}
+            <div class="current-image"><span>Ảnh hiện tại (được giữ lại nếu không chọn ảnh mới)</span><img src="{{ cake.image.url }}" alt="Ảnh hiện tại của {{ cake.name }}"></div>
+        {% endif %}
+        <form method="post" enctype="multipart/form-data" class="form-stack">
+            {% csrf_token %}
+            {% for field in form %}
+                <div class="form-field">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}<div class="field-help">{{ field.help_text }}</div>{% endif %}
+                    {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+                </div>
+            {% endfor %}
+            {% if form.non_field_errors %}<div class="form-errors">{{ form.non_field_errors }}</div>{% endif %}
+            <div class="image-preview" id="image-preview" hidden><span>Xem trước ảnh mới</span><img id="image-preview-image" alt="Xem trước ảnh được chọn"></div>
+            <div class="form-actions">
+                <button class="button button-primary" type="submit">Lưu mẫu bánh</button>
+                <a class="button button-outline" href="{% url 'catalog:owner_cake_list' %}">Hủy</a>
+            </div>
+        </form>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/catalog-image-preview.js" defer></script>
+{% endblock %}

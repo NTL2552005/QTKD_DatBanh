@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}Quản lý danh mục — BiBi Cake{% endblock %}
+
+{% block content %}
+<section class="management-page page-shell">
+    <div class="management-heading">
+        <div>
+            <span class="eyebrow">KHU VỰC CHỦ CỬA HÀNG</span>
+            <h1>Quản lý danh mục</h1>
+            <p>Ngừng danh mục sẽ ẩn các mẫu bánh thuộc danh mục khỏi trang khách hàng.</p>
+        </div>
+        <a class="button button-primary" href="{% url 'catalog:owner_category_create' %}">＋ Thêm danh mục</a>
+    </div>
+    <form method="get" class="filter-panel management-filter">
+        <div class="filter-field">
+            <label for="category-search">Tìm tên danh mục</label>
+            <input id="category-search" type="search" name="q" value="{{ search_query }}" placeholder="Tên danh mục">
+        </div>
+        <div class="filter-field">
+            <label for="category-status">Trạng thái</label>
+            <select id="category-status" name="status">
+                <option value="">Tất cả trạng thái</option>
+                <option value="active" {% if selected_status == "active" %}selected{% endif %}>Đang hoạt động</option>
+                <option value="inactive" {% if selected_status == "inactive" %}selected{% endif %}>Ngừng hoạt động</option>
+            </select>
+        </div>
+        <button class="button button-outline" type="submit">Áp dụng lọc</button>
+    </form>
+    {% if page_obj.object_list %}
+        <div class="table-wrap">
+            <table class="management-table">
+                <thead><tr><th>Danh mục</th><th>Số mẫu bánh</th><th>Trạng thái</th><th>Cập nhật</th><th>Thao tác</th></tr></thead>
+                <tbody>
+                    {% for category in page_obj %}
+                        <tr>
+                            <td><strong>{{ category.name }}</strong><small>{{ category.description|default:"Chưa có mô tả"|truncatechars:90 }}</small></td>
+                            <td>{{ category.cake_count }}</td>
+                            <td><span class="status-pill {% if category.is_active %}status-active{% else %}status-inactive{% endif %}">{% if category.is_active %}Đang hoạt động{% else %}Ngừng hoạt động{% endif %}</span></td>
+                            <td>{{ category.updated_at|date:"d/m/Y H:i" }}</td>
+                            <td>
+                                <div class="table-actions">
+                                    <a class="text-link" href="{% url 'catalog:owner_category_edit' category.pk %}">Sửa</a>
+                                    <form method="post" action="{% url 'catalog:owner_category_toggle' category.pk %}" {% if category.is_active %}onsubmit="return confirm('Các mẫu bánh thuộc danh mục này sẽ được ẩn khỏi trang khách hàng. Bạn muốn tiếp tục?')"{% endif %}>
+                                        {% csrf_token %}
+                                        <button class="button button-small {% if category.is_active %}button-outline{% else %}button-primary{% endif %}" type="submit">{% if category.is_active %}Ngừng hoạt động{% else %}Kích hoạt{% endif %}</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% include "catalog/partials/pagination.html" %}
+    {% else %}
+        <div class="empty-state"><span aria-hidden="true">✿</span><h2>Chưa có danh mục</h2><p>Thêm danh mục để bắt đầu sắp xếp các mẫu bánh.</p></div>
+    {% endif %}
+</section>
+{% endblock %}

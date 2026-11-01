@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% load catalog_format %}
+
+{% block title %}{{ cake.name }} — BiBi Cake{% endblock %}
+
+{% block content %}
+<section class="cake-detail page-shell">
+    <a class="back-link" href="{% url 'catalog:cake_list' %}">← Quay lại danh sách mẫu bánh</a>
+    <div class="detail-grid">
+        <div class="detail-image">
+            {% if cake.image %}
+                <img src="{{ cake.image.url }}" alt="Mẫu {{ cake.name }}">
+            {% else %}
+                <img src="/static/images/cake-placeholder.svg" alt="Ảnh minh họa mẫu bánh">
+            {% endif %}
+        </div>
+        <div class="detail-copy">
+            <span class="cake-category">{{ cake.category.name }}</span>
+            <h1>{{ cake.name }}</h1>
+            <div class="detail-description">{{ cake.description|linebreaks }}</div>
+            {% if cake.suitable_occasions or cake.flavor_profile or cake.style_tags or cake.serving_information or cake.ingredient_information or cake.allergen_information %}
+                {% if cake.advisory_data_verified %}
+                    <p class="field-help"><strong>Thông tin tư vấn đã được cửa hàng xác nhận.</strong></p>
+                {% else %}
+                    <p class="field-help" role="note"><strong>Gợi ý minh họa, chưa được cửa hàng xác nhận.</strong> Vui lòng hỏi nhân viên để xác nhận chi tiết trước khi đặt.</p>
+                {% endif %}
+                <dl class="cake-facts">
+                    {% if cake.suitable_occasions %}<dt>Dịp phù hợp</dt><dd>{{ cake.suitable_occasions }}</dd>{% endif %}
+                    {% if cake.flavor_profile %}<dt>Hương vị</dt><dd>{{ cake.flavor_profile }}</dd>{% endif %}
+                    {% if cake.style_tags %}<dt>Phong cách</dt><dd>{{ cake.style_tags }}</dd>{% endif %}
+                    {% if cake.serving_information %}<dt>Khẩu phần</dt><dd>{{ cake.serving_information }}</dd>{% endif %}
+                    {% if cake.ingredient_information %}<dt>Thành phần</dt><dd>{{ cake.ingredient_information|linebreaksbr }}</dd>{% endif %}
+                    {% if cake.allergen_information %}<dt>Thông tin dị ứng</dt><dd>{{ cake.allergen_information|linebreaksbr }}</dd>{% endif %}
+                </dl>
+                <p class="field-help">Thông tin thành phần hoặc dị ứng không bảo đảm an toàn; cần nhân viên xác nhận trực tiếp.</p>
+            {% endif %}
+            <p class="cake-price-label">Giá tham khảo</p>
+            <p class="detail-price">{{ cake.reference_price|vnd }}</p>
+            <p class="price-disclaimer">Giá cuối cùng được cửa hàng xác nhận theo kích thước, trang trí và yêu cầu của bạn.</p>
+            <a class="button button-primary" href="{% url 'orders:create_order' cake.slug %}">Đặt mẫu bánh này</a>
+        </div>
+    </div>
+</section>
+{% endblock %}

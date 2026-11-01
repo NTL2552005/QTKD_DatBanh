@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 440" role="img" aria-labelledby="title">
+  <title id="title">Minh họa bánh kem BiBi Cake</title>
+  <rect width="640" height="440" rx="36" fill="#f8e6e9"/>
+  <circle cx="320" cy="220" r="165" fill="#fff5ed"/>
+  <ellipse cx="320" cy="335" rx="177" ry="25" fill="#dfb9b8"/>
+  <path d="M170 231h300v87a24 24 0 0 1-24 24H194a24 24 0 0 1-24-24z" fill="#e99eaa" stroke="#fff9f3" stroke-width="10"/>
+  <path d="M170 256h300v25H170zm0 48h300v25H170z" fill="#f8d7d4"/>
+  <path d="M212 167h216v68H212z" fill="#e99eaa" stroke="#fff9f3" stroke-width="10"/>
+  <ellipse cx="320" cy="168" rx="108" ry="25" fill="#fff9f3"/>
+  <path d="M315 166h10v-53h-10z" fill="#ce7890"/>
+  <path d="M320 102c-16 17-11 30 0 32 12-4 16-17 0-32" fill="#efb66e"/>
+  <circle cx="269" cy="160" r="12" fill="#b85970"/>
+  <circle cx="369" cy="160" r="12" fill="#b85970"/>
+</svg>
