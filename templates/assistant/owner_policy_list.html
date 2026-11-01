@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Chính sách chatbot — BiBi Cake{% endblock %}
+{% block extra_styles %}<link rel="stylesheet" href="{% static 'css/assistant.css' %}">{% endblock %}
+
+{% block content %}
+<section class="page-shell assistant-page">
+    <div class="assistant-owner-heading">
+        <div>
+            <span class="eyebrow">QUẢN LÝ NỘI DUNG TRUY HỒI</span>
+            <h1>Chính sách cửa hàng</h1>
+            <p class="muted">Chỉ OWNER có thể sửa và công bố. Chính sách demo được nạp ở trạng thái nháp; nội dung cần được rà soát trước khi công bố.</p>
+        </div>
+        <a class="button button-primary" href="{% url 'assistant:owner_policy_create' %}">Thêm chính sách</a>
+    </div>
+    {% if policies %}
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Mã</th><th>Chính sách</th><th>Trạng thái</th><th>Phiên bản</th><th>Cập nhật</th><th>Thao tác</th></tr></thead>
+                <tbody>
+                    {% for policy in policies %}
+                        <tr>
+                            <td>{{ policy.code }}</td>
+                            <td>{{ policy.title }}</td>
+                            <td>
+                                {% if policy.is_published %}
+                                    <span class="policy-status policy-status-published">Đã công bố</span>
+                                {% else %}
+                                    <span class="policy-status">Bản nháp</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ policy.version }}</td>
+                            <td>{{ policy.updated_at|date:"d/m/Y H:i" }}</td>
+                            <td class="table-actions">
+                                <a class="text-link" href="{% url 'assistant:owner_policy_edit' policy.pk %}">Sửa</a>
+                                <form method="post" action="{% url 'assistant:owner_policy_toggle' policy.pk %}">
+                                    {% csrf_token %}
+                                    <button class="button button-outline button-small" type="submit">{% if policy.is_published %}Gỡ công bố{% else %}Công bố{% endif %}</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <span aria-hidden="true">✿</span>
+            <h2>Chưa có nội dung chính sách</h2>
+            <p>Thêm nội dung đã được cửa hàng duyệt trước khi công bố cho chatbot. Không tạo quy định mẫu như chính sách thật.</p>
+        </div>
+    {% endif %}
+</section>
+{% endblock %}

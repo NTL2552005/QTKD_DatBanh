@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }} — Chính sách chatbot{% endblock %}
+{% block extra_styles %}<link rel="stylesheet" href="{% static 'css/assistant.css' %}">{% endblock %}
+
+{% block content %}
+<section class="page-shell assistant-page">
+    <a class="back-link" href="{% url 'assistant:owner_policy_list' %}">← Danh sách chính sách</a>
+    <div class="management-form-card">
+        <span class="eyebrow">CHỈ DÀNH CHO OWNER</span>
+        <h1>{{ page_title }}</h1>
+        <p class="muted">Nội dung chính sách demo cần được OWNER rà soát. Lưu nội dung sửa sẽ tạo phiên bản mới ở trạng thái nháp; công bố hoặc ẩn bằng nút riêng trong danh sách.</p>
+        <form method="post" class="form-stack">
+            {% csrf_token %}
+            {% if form.non_field_errors %}<div class="form-errors">{{ form.non_field_errors }}</div>{% endif %}
+            {% for field in form %}
+                <div class="form-field">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}<div class="field-help">{{ field.help_text }}</div>{% endif %}
+                    {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+                </div>
+            {% endfor %}
+            <button class="button button-primary" type="submit">Lưu chính sách</button>
+        </form>
+    </div>
+</section>
+{% endblock %}

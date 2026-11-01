@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Tư vấn chọn bánh — BiBi Cake{% endblock %}
+{% block extra_styles %}<link rel="stylesheet" href="{% static 'css/assistant.css' %}">{% endblock %}
+
+{% block content %}
+<section class="page-shell assistant-page">
+    <header class="assistant-heading">
+        <span class="eyebrow">BI BI CAKE · TƯ VẤN</span>
+        <h1>Tìm chiếc bánh phù hợp</h1>
+        <p>AI hỗ trợ tư vấn dựa trên mẫu bánh và chính sách đã công bố. Cửa hàng xác nhận giá và lịch giao.</p>
+    </header>
+
+    {% if not ai_available %}
+        <div class="assistant-notice" role="status">
+            <strong>AI tạm thời không khả dụng.</strong>
+            <span>Hội thoại vẫn có thể tra cứu mẫu bánh công khai và chính sách đã công bố. Chế độ này không tạo bản nháp.</span>
+            <a class="button button-outline" href="{% url 'catalog:cake_list' %}">Xem mẫu và đặt bánh</a>
+        </div>
+    {% endif %}
+
+    {% if not user.is_authenticated %}
+        <div class="assistant-notice">
+            <p>Bạn có thể xem mẫu bánh công khai. Đăng nhập bằng tài khoản khách hàng để bắt đầu tư vấn.</p>
+            <a class="button button-primary" href="{% url 'accounts:login' %}">Đăng nhập</a>
+            <a class="button button-outline" href="{% url 'accounts:register' %}">Tạo tài khoản</a>
+        </div>
+    {% else %}
+        <div class="assistant-start-card">
+            <div>
+                <h2>Bắt đầu một cuộc tư vấn</h2>
+                {% if ai_available %}
+                    <p class="muted">Không cần gửi thông tin người nhận, số điện thoại hoặc địa chỉ trong hội thoại.</p>
+                {% else %}
+                    <p class="muted">Hệ thống chỉ tra cứu dữ liệu công khai; không gửi nội dung tới Gemini hoặc tạo bản nháp.</p>
+                {% endif %}
+            </div>
+            <form method="post" action="{% url 'assistant:create_session' %}">
+                {% csrf_token %}
+                <button class="button button-primary" type="submit">Bắt đầu tư vấn</button>
+            </form>
+        </div>
+    {% endif %}
+
+    {% if user.is_authenticated and sessions %}
+        <section class="assistant-sessions">
+            <h2>Các phiên gần đây</h2>
+            <ul>
+                {% for session in sessions %}
+                    <li>
+                        <a href="{% url 'assistant:chat_session' session.pk %}">
+                            Tư vấn ngày {{ session.updated_at|date:"d/m/Y H:i" }}
+                        </a>
+                        <span>{{ session.get_status_display }}</span>
+                    </li>
+                {% endfor %}
+            </ul>
+        </section>
+    {% endif %}
+</section>
+{% endblock %}
