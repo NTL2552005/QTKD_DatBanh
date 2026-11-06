@@ -124,7 +124,7 @@ Mật khẩu demo được lấy từ `DEMO_PASSWORD` trong `.env`; lệnh `seed
 - Sau khi khách xác nhận báo giá, khách có thể bấm “Tôi đã chuyển khoản trước” để báo cửa hàng đối chiếu. Đây chỉ là thông báo, không tạo khoản thu hoặc chuyển trạng thái thanh toán; STAFF chỉ ghi `Payment` sau khi xác nhận tiền thực nhận. Giao thành công cùng khoản thu đủ mới hoàn tất đơn.
 - STAFF chỉ ghi tiền đã thực nhận. Chuyển khoản được đối chiếu thủ công bằng mã tham chiếu; hệ thống không xác minh ngân hàng, gọi API thanh toán hoặc tự nhận ảnh chuyển khoản là giao dịch. Hoàn tiền cũng được thực hiện bên ngoài; hệ thống chỉ lưu nhận xác nhận của nhân viên.
 - Ảnh giao hàng, sự cố và hoàn tiền lưu trong `PRIVATE_MEDIA_ROOT` và chỉ được phục vụ qua endpoint kiểm tra quyền. Các thao tác ghi dùng POST/CSRF, kiểm tra role/trạng thái/version và transaction; mã idempotency cùng ràng buộc DB ngăn ghi trùng.
-- Dashboard STAFF hiển thị hàng đợi theo trạng thái thật; OWNER có danh sách sự cố chờ quyết định. Chưa có GPS, API ngân hàng, đơn vị vận chuyển, thông báo tự động, AI hoặc workflow tự động.
+- Dashboard STAFF hiển thị hàng đợi theo trạng thái thật; OWNER có danh sách sự cố chờ quyết định. Chưa có GPS, API ngân hàng hoặc tích hợp đơn vị vận chuyển.
 - Kịch bản demo: mở đơn `SAN_SANG_GIAO` tại `/staff/orders/`, bắt đầu giao, xác nhận khách nhận tại trang khách, sau đó STAFF ghi khoản tiền mặt thực nhận để đơn chuyển `HOAN_TAT`. Để thử giao lại, ghi nhận giao thất bại, thống nhất lịch với khách và bắt đầu lần giao mới.
 
 ## Đánh giá sau đơn hàng
@@ -134,6 +134,24 @@ Mật khẩu demo được lấy từ `DEMO_PASSWORD` trong `.env`; lệnh `seed
 - `Order.completed_at` được ghi một lần khi đơn thực sự hoàn tất. Migration backfill chỉ lấy lịch sử `ORDER_COMPLETED` đáng tin; đơn cũ không có mốc vẫn yêu cầu kiểm tra.
 - Mốc `completed_at + ORDER_REVIEW_WINDOW_HOURS` (mặc định 24 giờ) là thời điểm workflow có thể nhắc, **không phải hạn chót**. Khách vẫn có thể đánh giá đơn hoàn tất chưa được đánh giá sau mốc này; trạng thái đơn không đổi.
 - CUSTOMER xem trạng thái và gửi tại `/orders/mine/`; OWNER xem/lọc, thống kê, phản hồi tại `/owner/reviews/`. STAFF chỉ xem nhận xét trong đơn họ được quyền xử lý.
+- Nhận xét gốc được giữ nguyên; review có nhận xét tạo outbox `ReviewClassificationEvent` và gửi JSON tối thiểu sang n8n. Review không có nội dung vẫn được lưu nhưng sự kiện ở trạng thái `SKIPPED`.
+- Cấu hình trong `.env`: `N8N_REVIEW_WEBHOOK_URL`, `N8N_REVIEW_WEBHOOK_KEY`, `N8N_REVIEW_CALLBACK_KEY` (không dùng chung hai khóa) và `N8N_REVIEW_TIMEOUT_SECONDS`. Chỉ HTTPS được phép ngoài môi trường local; webhook nhận `X-Workflow-Key`.
+- n8n gửi callback POST tới `/api/integrations/n8n/review-classification/` với `X-Callback-Key`. Website kiểm tra `event_id`, `review_id`, nhãn, kiểu/giá trị confidence và tự áp ngưỡng `0.95`; không nhận trạng thái hoặc nhãn cuối do n8n tự khai.
+- Kết quả không hợp lệ hoặc confidence dưới `0.95` xuất hiện tại `/staff/reviews/pending/` cho STAFF/OWNER xác nhận. POST có CSRF; phiên bản phân loại ngăn ghi đè đồng thời, còn `ReviewClassificationAudit` giữ lịch sử xác nhận.
+
+Gửi lại các sự kiện đang chờ (số lần thử hữu hạn, timeout cấu hình):
+
+```powershell
+.\.venv\Scripts\python.exe manage.py dispatch_review_classification_events --limit 20
+```
+
+Sau khi sửa cấu hình hoặc khắc phục endpoint, có thể xếp lại các sự kiện đã thất bại:
+
+```powershell
+.\.venv\Scripts\python.exe manage.py dispatch_review_classification_events --retry-failed --limit 20
+```
+
+Callback là endpoint duy nhất miễn CSRF; endpoint bắt buộc POST và khóa callback riêng. Các khóa không được đặt trong frontend, payload, Git hoặc log. Gửi thành công tới webhook chỉ xác nhận n8n đã tiếp nhận, không khẳng định nhãn đã được lưu thành công.
 
 ## Workflow webhook và outbox
 
@@ -168,8 +186,10 @@ OWNER giám sát/lọc sự kiện và POST yêu cầu thử lại tại `/owner
 - `/owner/revision-approvals/` — yêu cầu chỉnh sửa chờ chủ cửa hàng duyệt
 - `/owner/incidents/` — sự cố chờ chủ cửa hàng quyết định
 - `/owner/reviews/` — danh sách đánh giá nội bộ và phản hồi của OWNER
+- `/staff/reviews/pending/` — hàng đợi phân loại đánh giá chờ STAFF/OWNER xác nhận
+- `/api/integrations/n8n/review-classification/` — callback kết quả phân loại từ n8n
 - `/owner/workflow-events/` — outbox, trạng thái gửi webhook và thử lại thủ công
-- `/assistant/` — thông tin tư vấn AI (AI tắt nếu chưa cấu hình nhà cung cấp)
+- `/policies/` — chính sách cửa hàng công khai
 - `/owner/assistant/policies/` — OWNER quản lý nội dung chính sách truy hồi
 - `/orders/review-images/<id>/` — ảnh riêng tư, cần đăng nhập và có quyền liên quan
 - `/orders/evidence/<type>/<id>/` — minh chứng giao/sự cố/hoàn tiền riêng tư, cần quyền phù hợp
@@ -185,7 +205,7 @@ OWNER giám sát/lọc sự kiện và POST yêu cầu thử lại tại `/owner
 .\.venv\Scripts\python.exe manage.py test
 ```
 
-Kết quả xác minh gần nhất: `check`, `makemigrations --check --dry-run` và `migrate --check` đều đạt; toàn bộ 172 test đạt. Các migration hiện có đã áp dụng. Test webhook và trợ lý AI dùng mock, không gửi request/email/provider thật.
+Trong phiên này, `manage.py test orders.test_reviews` chạy đạt 33 test; bộ test toàn dự án chưa được chạy lại. Test dùng HTTP giả lập và database tạm, vì vậy không xác nhận workflow n8n bên ngoài đang hoạt động hoặc migration đã áp dụng cho database dự án.
 
 ## Cấu trúc
 

@@ -1745,6 +1745,18 @@ class Refund(models.Model):
 
 
 class OrderReview(models.Model):
+    class ClassificationStatus(models.TextChoices):
+        NOT_REQUESTED = "NOT_REQUESTED", "Không yêu cầu phân loại"
+        PENDING = "PENDING", "Chờ phân loại"
+        AUTO_LABELED = "AUTO_LABELED", "AI đã phân loại"
+        PENDING_REVIEW = "PENDING_REVIEW", "Chờ nhân viên xác nhận"
+        REVIEWED = "REVIEWED", "Đã được nhân viên xác nhận"
+
+    class SentimentLabel(models.TextChoices):
+        POSITIVE = "POSITIVE", "Tích cực"
+        NEUTRAL = "NEUTRAL", "Trung tính"
+        NEGATIVE = "NEGATIVE", "Tiêu cực"
+
     order = models.OneToOneField(
         Order,
         on_delete=models.PROTECT,
@@ -1760,6 +1772,42 @@ class OrderReview(models.Model):
     rating = models.PositiveSmallIntegerField("điểm đánh giá")
     comment = models.TextField("nhận xét", max_length=2000, blank=True)
     created_at = models.DateTimeField("thời điểm đánh giá", auto_now_add=True)
+    ai_label = models.CharField(
+        "nhãn AI",
+        max_length=16,
+        choices=SentimentLabel.choices,
+        null=True,
+        blank=True,
+    )
+    ai_confidence = models.FloatField("độ tin cậy AI", null=True, blank=True)
+    ai_reason = models.TextField("lý do AI", blank=True)
+    classification_status = models.CharField(
+        "trạng thái phân loại",
+        max_length=20,
+        choices=ClassificationStatus.choices,
+        default=ClassificationStatus.NOT_REQUESTED,
+    )
+    final_label = models.CharField(
+        "nhãn cuối cùng",
+        max_length=16,
+        choices=SentimentLabel.choices,
+        null=True,
+        blank=True,
+    )
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="review_classifications",
+        verbose_name="nhân viên xác nhận",
+        null=True,
+        blank=True,
+    )
+    reviewed_at = models.DateTimeField("thời điểm xác nhận", null=True, blank=True)
+    review_note = models.TextField("ghi chú xác nhận", blank=True)
+    classification_version = models.PositiveIntegerField(
+        "phiên bản phân loại",
+        default=0,
+    )
 
     class Meta:
         ordering = ("-created_at", "-pk")
@@ -1774,6 +1822,89 @@ class OrderReview(models.Model):
 
     def __str__(self):
         return f"{self.order.code} · {self.rating}/5 sao"
+
+
+class ReviewClassificationEvent(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "Chờ gửi"
+        PROCESSING = "PROCESSING", "Đang gửi"
+        SENT = "SENT", "Đã gửi tới n8n"
+        FAILED = "FAILED", "Gửi thất bại"
+        SKIPPED = "SKIPPED", "Bỏ qua vì không có nhận xét"
+
+    event_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    review = models.OneToOneField(
+        OrderReview,
+        on_delete=models.PROTECT,
+        related_name="classification_event",
+        verbose_name="đánh giá",
+    )
+    payload = models.JSONField(default=dict)
+    status = models.CharField(max_length=16, choices=Status.choices)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    next_attempt_at = models.DateTimeField(default=timezone.now)
+    last_attempt_at = models.DateTimeField(null=True, blank=True)
+    last_error = models.CharField(max_length=500, blank=True)
+    callback_received_at = models.DateTimeField(null=True, blank=True)
+    callback_result = models.JSONField(null=True, blank=True)
+    lease_until = models.DateTimeField(null=True, blank=True)
+    lease_token = models.UUIDField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("created_at", "pk")
+        indexes = [
+            models.Index(
+                fields=("status", "next_attempt_at"),
+                name="orders_rev_event_status_idx",
+            ),
+        ]
+        verbose_name = "sự kiện phân loại đánh giá"
+        verbose_name_plural = "sự kiện phân loại đánh giá"
+
+    def __str__(self):
+        return f"{self.event_id} · {self.get_status_display()}"
+
+
+class ReviewClassificationAudit(models.Model):
+    review = models.ForeignKey(
+        OrderReview,
+        on_delete=models.PROTECT,
+        related_name="classification_audits",
+        verbose_name="đánh giá",
+    )
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="review_classification_audits",
+        verbose_name="người xác nhận",
+    )
+    previous_label = models.CharField(
+        "nhãn trước đó",
+        max_length=16,
+        choices=OrderReview.SentimentLabel.choices,
+        null=True,
+        blank=True,
+    )
+    final_label = models.CharField(
+        "nhãn cuối cùng",
+        max_length=16,
+        choices=OrderReview.SentimentLabel.choices,
+    )
+    review_note = models.TextField("ghi chú xác nhận", blank=True)
+    reviewed_at = models.DateTimeField("thời điểm xác nhận", auto_now_add=True)
+
+    class Meta:
+        ordering = ("reviewed_at", "pk")
+        indexes = [
+            models.Index(
+                fields=("review", "reviewed_at"),
+                name="orders_rev_audit_review_idx",
+            ),
+        ]
+        verbose_name = "lịch sử xác nhận phân loại"
+        verbose_name_plural = "lịch sử xác nhận phân loại"
 
 
 class ReviewReply(models.Model):

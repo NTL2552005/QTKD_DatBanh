@@ -276,6 +276,21 @@ urlpatterns = [
         name="customer_submit_order_review",
     ),
     path(
+        "api/integrations/n8n/review-classification/",
+        views.n8n_review_classification_callback,
+        name="n8n_review_classification_callback",
+    ),
+    path(
+        "staff/reviews/pending/",
+        views.staff_pending_review_classifications,
+        name="staff_pending_review_classifications",
+    ),
+    path(
+        "staff/reviews/<int:review_id>/classification/",
+        views.staff_review_classification_detail,
+        name="staff_review_classification_detail",
+    ),
+    path(
         "owner/reviews/",
         views.owner_review_list,
         name="owner_review_list",

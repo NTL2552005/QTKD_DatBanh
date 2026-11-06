@@ -1,3 +1,5 @@
+import json
+import logging
 import uuid
 from datetime import datetime, time, timedelta
 
@@ -7,10 +9,15 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Avg, Count, Q
-from django.http import FileResponse, HttpResponseNotAllowed
+from django.http import (
+    FileResponse,
+    HttpResponseNotAllowed,
+    JsonResponse,
+)
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
 
 from accounts.decorators import role_required
 from accounts.models import User
@@ -51,6 +58,7 @@ from .forms import (
     RedeliveryForm,
     RefundForm,
     ReviewPeriodFilterForm,
+    ReviewClassificationReviewForm,
     ReviewReplyForm,
     RevisionClassificationForm,
     RevisionRequestForm,
@@ -75,6 +83,7 @@ from .models import (
     Refund,
     RevisionRequest,
     ReviewReply,
+    ReviewClassificationEvent,
     StaffAvailabilityCheck,
     WorkflowEvent,
 )
@@ -106,6 +115,15 @@ from .reviews import (
     review_deadline,
     review_state,
     submit_order_review,
+)
+from .review_classification import (
+    CallbackConflict,
+    CallbackPayloadError,
+    StaleReviewClassification,
+    accept_review_classification,
+    callback_key_matches,
+    confirm_review_classification,
+    dispatch_review_classification_events,
 )
 from .production import (
     accept_review,
@@ -144,6 +162,8 @@ from .services import (
     notify_customer_intake_rejection,
     update_customer_request,
 )
+
+logger = logging.getLogger(__name__)
 from .workflow_events import request_event_retry
 
 PAGE_SIZE = 10
@@ -832,12 +852,123 @@ def customer_submit_order_review(request, pk):
     else:
         if created:
             messages.success(request, "Đã gửi đánh giá đơn hàng.")
+            if _review.comment.strip():
+                try:
+                    dispatch_review_classification_events(
+                        limit=1,
+                        event_id=_review.classification_event.event_id,
+                    )
+                except ValueError:
+                    logger.warning(
+                        "Không gửi được sự kiện phân loại đánh giá; sự kiện được giữ trong outbox."
+                    )
+                    messages.warning(
+                        request,
+                        "Đánh giá đã được lưu; chưa gửi được sang n8n. Sự kiện vẫn được giữ để thử lại.",
+                    )
+                else:
+                    _review.classification_event.refresh_from_db()
+                    if _review.classification_event.status in (
+                        ReviewClassificationEvent.Status.PENDING,
+                        ReviewClassificationEvent.Status.FAILED,
+                    ):
+                        messages.warning(
+                            request,
+                            "Đánh giá đã được lưu nhưng n8n chưa tiếp nhận; sự kiện sẽ được thử lại.",
+                        )
+            else:
+                messages.info(
+                    request,
+                    "Đánh giá không có nhận xét nên không cần phân loại văn bản.",
+                )
         else:
             messages.info(
                 request,
                 "Đánh giá đã được gửi trước đó và không thể sửa hoặc gửi lại.",
             )
     return redirect("orders:order_detail", pk=order.pk)
+
+
+@csrf_exempt
+def n8n_review_classification_callback(request):
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    if not callback_key_matches(request.headers.get("X-Callback-Key", "")):
+        return JsonResponse({"error": "invalid_callback_key"}, status=403)
+    if len(request.body) > 65536:
+        return JsonResponse({"error": "payload_too_large"}, status=413)
+    if request.content_type != "application/json":
+        return JsonResponse({"error": "content_type_must_be_json"}, status=415)
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+        result = accept_review_classification(payload)
+    except (UnicodeDecodeError, json.JSONDecodeError, CallbackPayloadError) as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+    except LookupError as exc:
+        return JsonResponse({"error": str(exc)}, status=404)
+    except CallbackConflict as exc:
+        return JsonResponse({"error": str(exc)}, status=409)
+    return JsonResponse({"status": result})
+
+
+@login_required
+@role_required((User.Role.STAFF, User.Role.OWNER))
+def staff_pending_review_classifications(request):
+    pending = (
+        OrderReview.objects.filter(
+            classification_status=OrderReview.ClassificationStatus.PENDING_REVIEW
+        )
+        .select_related("order", "customer")
+        .order_by("created_at", "pk")
+    )
+    page_obj = Paginator(pending, PAGE_SIZE).get_page(request.GET.get("page"))
+    return render(
+        request,
+        "orders/staff_review_classification_list.html",
+        {"page_obj": page_obj},
+    )
+
+
+@login_required
+@role_required((User.Role.STAFF, User.Role.OWNER))
+def staff_review_classification_detail(request, review_id):
+    review = get_object_or_404(
+        OrderReview.objects.select_related("order", "customer", "reviewed_by"),
+        pk=review_id,
+    )
+    if review.classification_status != OrderReview.ClassificationStatus.PENDING_REVIEW:
+        if request.method == "POST":
+            messages.error(request, "Đánh giá này đã được xử lý; không thể ghi đè.")
+            return redirect("orders:staff_pending_review_classifications")
+    form = ReviewClassificationReviewForm(
+        request.POST or None,
+        initial={"version": review.classification_version},
+    )
+    if request.method == "POST":
+        if not form.is_valid():
+            return render(
+                request,
+                "orders/staff_review_classification_detail.html",
+                {"review": review, "form": form},
+            )
+        try:
+            confirm_review_classification(
+                review_id=review.pk,
+                reviewer=request.user,
+                final_label=form.cleaned_data["final_label"],
+                review_note=form.cleaned_data["review_note"],
+                version=form.cleaned_data["version"],
+            )
+        except StaleReviewClassification as exc:
+            messages.error(request, str(exc))
+        else:
+            messages.success(request, "Đã xác nhận nhãn đánh giá.")
+        return redirect("orders:staff_pending_review_classifications")
+    return render(
+        request,
+        "orders/staff_review_classification_detail.html",
+        {"review": review, "form": form},
+    )
 
 
 @login_required

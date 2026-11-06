@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}Xác nhận phân loại đánh giá — BiBi Cake{% endblock %}
+
+{% block content %}
+<section class="order-detail-page page-shell">
+    <a class="back-link" href="{% url 'orders:staff_pending_review_classifications' %}">← Đánh giá chờ xác nhận</a>
+    <div class="order-heading">
+        <div><span class="eyebrow">KIỂM DUYỆT NỘI BỘ</span><h1>{{ review.order.code }}</h1></div>
+        <span class="status-pill status-order">{{ review.get_classification_status_display }}</span>
+    </div>
+    <section class="order-section">
+        <h2>Đánh giá gốc</h2>
+        <dl class="order-facts">
+            <div><dt>Khách hàng</dt><dd>{{ review.customer.get_full_name|default:review.customer.username }}</dd></div>
+            <div><dt>Điểm</dt><dd>{{ review.rating }}/5 sao</dd></div>
+            <div><dt>Thời điểm gửi</dt><dd>{{ review.created_at|date:"d/m/Y H:i" }}</dd></div>
+        </dl>
+        <div class="review-comment">{{ review.comment|default:"Khách không để lại nhận xét."|linebreaksbr }}</div>
+    </section>
+    <section class="order-section">
+        <h2>Kết quả AI</h2>
+        <dl class="order-facts">
+            <div><dt>Nhãn AI</dt><dd>{{ review.get_ai_label_display|default:"Không hợp lệ" }}</dd></div>
+            <div><dt>Độ tin cậy</dt><dd>{% if review.ai_confidence != None %}{{ review.ai_confidence|floatformat:3 }}{% else %}Không có{% endif %}</dd></div>
+        </dl>
+        <p>{{ review.ai_reason|default:"Không có lý do từ n8n."|linebreaksbr }}</p>
+    </section>
+    {% if review.classification_status == "PENDING_REVIEW" %}
+        <section class="order-section">
+            <h2>Xác nhận nhãn cuối cùng</h2>
+            <form method="post" class="form-stack">
+                {% csrf_token %}
+                {{ form.version }}
+                {% for field in form.visible_fields %}
+                    <div class="form-field">
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+                    </div>
+                {% endfor %}
+                {% for error in form.non_field_errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+                <button class="button button-primary" type="submit" data-submit-once>Xác nhận</button>
+            </form>
+        </section>
+    {% elif review.reviewed_at %}
+        <section class="order-section">
+            <h2>Đã xác nhận</h2>
+            <p><strong>{{ review.get_final_label_display }}</strong> · {{ review.reviewed_by.get_full_name|default:review.reviewed_by.username }} · {{ review.reviewed_at|date:"d/m/Y H:i" }}</p>
+            <p>{{ review.review_note|default:"Không có ghi chú."|linebreaksbr }}</p>
+        </section>
+    {% endif %}
+    {% if review.classification_audits.all %}
+        <section class="order-section history-section">
+            <h2>Lịch sử xác nhận</h2>
+            <ol class="timeline">
+                {% for entry in review.classification_audits.all %}
+                    <li>
+                        <strong>
+                            {% if entry.previous_label %}{{ entry.get_previous_label_display }} → {% endif %}
+                            {{ entry.get_final_label_display }}
+                        </strong>
+                        <small>{{ entry.reviewed_at|date:"d/m/Y H:i" }} · {{ entry.reviewed_by.get_full_name|default:entry.reviewed_by.username }}</small>
+                        <p>{{ entry.review_note|default:"Không có ghi chú." }}</p>
+                    </li>
+                {% endfor %}
+            </ol>
+        </section>
+    {% endif %}
+</section>
+{% endblock %}

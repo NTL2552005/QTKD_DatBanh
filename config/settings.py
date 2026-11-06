@@ -1,4 +1,3 @@
-import math
 import os
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -105,43 +104,17 @@ WORKFLOW_WEBHOOK_URL = os.getenv("WORKFLOW_WEBHOOK_URL", "").strip()
 WORKFLOW_WEBHOOK_TOKEN = os.getenv("WORKFLOW_WEBHOOK_TOKEN", "")
 WORKFLOW_TIMEOUT_SECONDS = float(os.getenv("WORKFLOW_TIMEOUT_SECONDS", "5"))
 SITE_BASE_URL = os.getenv("SITE_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
-AI_ENABLED = os.getenv("AI_ENABLED", "False").lower() in {
-    "1",
-    "true",
-    "yes",
-    "on",
-}
-AI_PROVIDER = os.getenv("AI_PROVIDER", "gemini").strip().lower()
-AI_API_KEY = os.getenv("AI_API_KEY", "").strip()
-AI_MODEL = os.getenv("AI_MODEL", "").strip()
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
-GEMINI_MODEL = (
-    os.getenv("GEMINI_MODEL", "gemini-3.8-flash").strip()
-    or "gemini-3.8-flash"
+N8N_REVIEW_WEBHOOK_URL = os.getenv("N8N_REVIEW_WEBHOOK_URL", "").strip()
+N8N_REVIEW_WEBHOOK_KEY = os.getenv("N8N_REVIEW_WEBHOOK_KEY", "")
+N8N_REVIEW_CALLBACK_KEY = os.getenv("N8N_REVIEW_CALLBACK_KEY", "")
+N8N_REVIEW_TIMEOUT_SECONDS = float(
+    os.getenv("N8N_REVIEW_TIMEOUT_SECONDS", "5")
 )
-AI_TIMEOUT_SECONDS = float(os.getenv("AI_TIMEOUT_SECONDS", "10"))
-AI_MAX_RETRIES = int(os.getenv("AI_MAX_RETRIES", "1"))
-AI_MAX_OUTPUT_TOKENS = int(os.getenv("AI_MAX_OUTPUT_TOKENS", "800"))
-AI_MIN_CONFIDENCE = float(os.getenv("AI_MIN_CONFIDENCE", "0.55"))
-AI_USER_REQUESTS_PER_MINUTE = int(os.getenv("AI_USER_REQUESTS_PER_MINUTE", "6"))
-AI_GLOBAL_REQUESTS_PER_MINUTE = int(os.getenv("AI_GLOBAL_REQUESTS_PER_MINUTE", "60"))
 
-if (
-    not math.isfinite(WORKFLOW_TIMEOUT_SECONDS)
-    or WORKFLOW_TIMEOUT_SECONDS <= 0
-    or WORKFLOW_TIMEOUT_SECONDS > 30
-):
+if not 0 < WORKFLOW_TIMEOUT_SECONDS <= 30:
     raise ValueError("WORKFLOW_TIMEOUT_SECONDS must be between 0 and 30 seconds.")
-if not math.isfinite(AI_TIMEOUT_SECONDS) or not 1 <= AI_TIMEOUT_SECONDS <= 30:
-    raise ValueError("AI_TIMEOUT_SECONDS must be between 1 and 30 seconds.")
-if not 0 <= AI_MAX_RETRIES <= 2:
-    raise ValueError("AI_MAX_RETRIES must be between 0 and 2.")
-if not 100 <= AI_MAX_OUTPUT_TOKENS <= 4000:
-    raise ValueError("AI_MAX_OUTPUT_TOKENS must be between 100 and 4000.")
-if not math.isfinite(AI_MIN_CONFIDENCE) or not 0 <= AI_MIN_CONFIDENCE <= 1:
-    raise ValueError("AI_MIN_CONFIDENCE must be between 0 and 1.")
-if AI_USER_REQUESTS_PER_MINUTE < 1 or AI_GLOBAL_REQUESTS_PER_MINUTE < 1:
-    raise ValueError("AI rate limits must be positive integers.")
+if not 0 < N8N_REVIEW_TIMEOUT_SECONDS <= 30:
+    raise ValueError("N8N_REVIEW_TIMEOUT_SECONDS must be between 0 and 30 seconds.")
 
 _site_url = urlsplit(SITE_BASE_URL)
 if (

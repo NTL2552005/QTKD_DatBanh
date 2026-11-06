@@ -1,3 +1,4 @@
+import uuid
 from datetime import timedelta
 
 from django.conf import settings
@@ -7,7 +8,13 @@ from django.utils import timezone
 
 from accounts.models import User
 
-from .models import Order, OrderHistory, OrderReview, ReviewReply
+from .models import (
+    Order,
+    OrderHistory,
+    OrderReview,
+    ReviewClassificationEvent,
+    ReviewReply,
+)
 from .services import InvalidOrderTransition
 
 REVIEW_AVAILABLE = "available"
@@ -67,7 +74,8 @@ def submit_order_review(*, order_id, customer, rating, comment=""):
         raise InvalidOrderTransition("Thời gian gửi đánh giá chưa bắt đầu.")
     if isinstance(rating, bool) or not isinstance(rating, int) or not 1 <= rating <= 5:
         raise ValidationError({"rating": "Điểm đánh giá phải là số nguyên từ 1 đến 5."})
-    comment = comment.strip()
+    if not isinstance(comment, str):
+        raise ValidationError({"comment": "Nhận xét không hợp lệ."})
     if len(comment) > 2000:
         raise ValidationError({"comment": "Nhận xét không được vượt quá 2.000 ký tự."})
 
@@ -78,12 +86,41 @@ def submit_order_review(*, order_id, customer, rating, comment=""):
                 customer=customer,
                 rating=rating,
                 comment=comment,
+                classification_status=(
+                    OrderReview.ClassificationStatus.PENDING
+                    if comment.strip()
+                    else OrderReview.ClassificationStatus.NOT_REQUESTED
+                ),
             )
     except IntegrityError:
         existing = OrderReview.objects.filter(order=order).first()
         if existing is None:
             raise
         return existing, False
+
+    event_id = uuid.uuid4()
+    event_status = (
+        ReviewClassificationEvent.Status.PENDING
+        if comment.strip()
+        else ReviewClassificationEvent.Status.SKIPPED
+    )
+    payload = (
+        {
+            "event_id": str(event_id),
+            "review_id": str(review.pk),
+            "order_code": order.code,
+            "rating": review.rating,
+            "comment": review.comment,
+        }
+        if comment.strip()
+        else {}
+    )
+    ReviewClassificationEvent.objects.create(
+        event_id=event_id,
+        review=review,
+        payload=payload,
+        status=event_status,
+    )
 
     OrderHistory.objects.create(
         order=order,

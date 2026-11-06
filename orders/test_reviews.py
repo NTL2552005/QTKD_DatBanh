@@ -1,19 +1,33 @@
+import json
 from datetime import timedelta
 from decimal import Decimal
-from unittest.mock import patch
+from urllib.error import URLError
+from unittest.mock import Mock, patch
 
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
-from django.test import Client
+from django.test import Client, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import Order, OrderHistory, OrderReview, ReviewReply
+from .models import (
+    Order,
+    OrderHistory,
+    OrderReview,
+    ReviewClassificationAudit,
+    ReviewClassificationEvent,
+    ReviewReply,
+)
 from .reviews import (
     REVIEW_AVAILABLE,
     REVIEW_TIME_UNKNOWN,
     review_state,
     submit_order_review,
+)
+from .review_classification import (
+    StaleReviewClassification,
+    confirm_review_classification,
+    dispatch_review_classification_events,
 )
 from .services import InvalidOrderTransition
 from .tests import OrderWorkflowTestCase
@@ -42,8 +56,15 @@ class OrderReviewTests(OrderWorkflowTestCase):
         )
 
         self.assertTrue(created)
-        self.assertEqual(review.comment, "Bánh rất ngon.")
+        self.assertEqual(review.comment, "  Bánh rất ngon.  ")
         self.assertEqual(review.customer, self.customer)
+        self.assertEqual(
+            review.classification_status,
+            OrderReview.ClassificationStatus.PENDING,
+        )
+        event = ReviewClassificationEvent.objects.get(review=review)
+        self.assertEqual(event.payload["comment"], review.comment)
+        self.assertEqual(event.payload["review_id"], str(review.pk))
         self.assertEqual(OrderReview.objects.filter(order=order).count(), 1)
         self.assertEqual(
             OrderHistory.objects.filter(
@@ -138,18 +159,26 @@ class OrderReviewTests(OrderWorkflowTestCase):
                     rating=6,
                 )
 
-    def test_comment_is_trimmed_optional_and_limited_to_2000_characters(self):
+    def test_comment_is_preserved_optional_and_limited_to_2000_characters(self):
         order = self.complete_order()
         form = OrderReviewForm({"rating": "4", "comment": "   "})
         self.assertTrue(form.is_valid())
-        self.assertEqual(form.cleaned_data["comment"], "")
+        self.assertEqual(form.cleaned_data["comment"], "   ")
         review, _ = submit_order_review(
             order_id=order.pk,
             customer=self.customer,
             rating=4,
             comment="   ",
         )
-        self.assertEqual(review.comment, "")
+        self.assertEqual(review.comment, "   ")
+        self.assertEqual(
+            review.classification_event.status,
+            ReviewClassificationEvent.Status.SKIPPED,
+        )
+        self.assertEqual(
+            review.classification_status,
+            OrderReview.ClassificationStatus.NOT_REQUESTED,
+        )
 
         other_order = self.complete_order()
         too_long = "x" * 2001
@@ -191,6 +220,338 @@ class OrderReviewTests(OrderWorkflowTestCase):
             ).count(),
             1,
         )
+
+
+@override_settings(N8N_REVIEW_CALLBACK_KEY="callback-secret")
+class ReviewClassificationTests(OrderWorkflowTestCase):
+    def complete_order(self):
+        order = self.create_order()
+        Order.objects.filter(pk=order.pk).update(
+            status=Order.Status.HOAN_TAT,
+            completed_at=timezone.now() - timedelta(hours=1),
+        )
+        order.refresh_from_db()
+        return order
+
+    def submit_review(self, comment="Bánh rất ngon"):
+        return submit_order_review(
+            order_id=self.complete_order().pk,
+            customer=self.customer,
+            rating=5,
+            comment=comment,
+        )[0]
+
+    def callback_payload(self, review, **overrides):
+        payload = {
+            "event_id": str(review.classification_event.event_id),
+            "review_id": str(review.pk),
+            "ai_label": "POSITIVE",
+            "ai_confidence": 0.99,
+            "ai_reason": "Nhận xét có sắc thái tích cực.",
+            "ai_valid": True,
+        }
+        payload.update(overrides)
+        return payload
+
+    def post_callback(self, payload, *, key="callback-secret", client=None):
+        client = client or self.client
+        return client.post(
+            reverse("orders:n8n_review_classification_callback"),
+            data=json.dumps(payload),
+            content_type="application/json",
+            HTTP_X_CALLBACK_KEY=key,
+        )
+
+    def test_review_is_persisted_when_n8n_connection_fails(self):
+        order = self.complete_order()
+        self.client.force_login(self.customer)
+        with patch(
+            "orders.review_classification.build_opener",
+            side_effect=URLError("unavailable"),
+        ), self.settings(
+            DEBUG=True,
+            N8N_REVIEW_WEBHOOK_URL="http://127.0.0.1:5678/reviews",
+            N8N_REVIEW_WEBHOOK_KEY="test-workflow-key",
+            N8N_REVIEW_TIMEOUT_SECONDS=1,
+        ):
+            response = self.client.post(
+                reverse("orders:customer_submit_order_review", kwargs={"pk": order.pk}),
+                {"rating": "4", "comment": "  Tốt  "},
+            )
+
+        self.assertEqual(response.status_code, 302)
+        review = OrderReview.objects.get(order=order)
+        event = ReviewClassificationEvent.objects.get(review=review)
+        self.assertEqual(review.comment, "  Tốt  ")
+        self.assertEqual(event.attempts, 1)
+        self.assertEqual(event.status, ReviewClassificationEvent.Status.PENDING)
+
+    def test_dispatch_sends_minimal_payload_and_workflow_header(self):
+        review = self.submit_review()
+        response = Mock()
+        response.status = 202
+        response.__enter__ = Mock(return_value=response)
+        response.__exit__ = Mock(return_value=None)
+        opener = Mock()
+        opener.open.return_value = response
+        with patch(
+            "orders.review_classification.build_opener",
+            return_value=opener,
+        ), self.settings(
+            DEBUG=True,
+            N8N_REVIEW_WEBHOOK_URL="http://127.0.0.1:5678/reviews",
+            N8N_REVIEW_WEBHOOK_KEY="test-workflow-key",
+            N8N_REVIEW_TIMEOUT_SECONDS=1,
+        ):
+            result = dispatch_review_classification_events(
+                event_id=review.classification_event.event_id,
+                limit=1,
+            )
+
+        self.assertEqual(result["processed"], 1)
+        request = opener.open.call_args.args[0]
+        self.assertEqual(request.get_header("X-workflow-key"), "test-workflow-key")
+        payload = json.loads(request.data.decode("utf-8"))
+        self.assertEqual(
+            set(payload),
+            {"event_id", "review_id", "order_code", "rating", "comment"},
+        )
+        self.assertEqual(payload["comment"], review.comment)
+        self.assertNotIn("customer", payload)
+        self.assertNotIn("phone", payload)
+        self.assertNotIn("address", payload)
+        event = review.classification_event
+        event.refresh_from_db()
+        self.assertEqual(event.status, ReviewClassificationEvent.Status.SENT)
+        ReviewClassificationEvent.objects.filter(pk=event.pk).update(
+            status=ReviewClassificationEvent.Status.FAILED,
+            attempts=5,
+        )
+        with patch(
+            "orders.review_classification.build_opener",
+            return_value=opener,
+        ), self.settings(
+            DEBUG=True,
+            N8N_REVIEW_WEBHOOK_URL="http://127.0.0.1:5678/reviews",
+            N8N_REVIEW_WEBHOOK_KEY="test-workflow-key",
+            N8N_REVIEW_TIMEOUT_SECONDS=1,
+        ):
+            retry_result = dispatch_review_classification_events(
+                event_id=event.event_id,
+                limit=1,
+                retry_failed=True,
+            )
+        event.refresh_from_db()
+        self.assertEqual(retry_result["sent"], 1)
+        self.assertEqual(event.status, ReviewClassificationEvent.Status.SENT)
+        self.assertEqual(event.attempts, 1)
+
+    def test_callback_requires_callback_key_and_valid_matching_event(self):
+        review = self.submit_review()
+        url = reverse("orders:n8n_review_classification_callback")
+
+        self.assertEqual(
+            self.client.post(url, "{}", content_type="application/json").status_code,
+            403,
+        )
+        self.assertEqual(
+            self.post_callback(self.callback_payload(review), key="incorrect").status_code,
+            403,
+        )
+        self.assertEqual(
+            self.post_callback(
+                self.callback_payload(review, review_id="999999")
+            ).status_code,
+            400,
+        )
+        self.assertEqual(
+            self.post_callback(
+                self.callback_payload(review, event_id="00000000-0000-0000-0000-000000000000")
+            ).status_code,
+            404,
+        )
+
+    def test_callback_threshold_routes_094_to_staff_and_095_to_auto(self):
+        for confidence, expected in (
+            (0.94, OrderReview.ClassificationStatus.PENDING_REVIEW),
+            (0.95, OrderReview.ClassificationStatus.AUTO_LABELED),
+        ):
+            with self.subTest(confidence=confidence):
+                review = self.submit_review()
+                response = self.post_callback(
+                    self.callback_payload(review, ai_confidence=confidence)
+                )
+                self.assertEqual(response.status_code, 200)
+                review.refresh_from_db()
+                self.assertEqual(review.classification_status, expected)
+                self.assertEqual(
+                    review.final_label,
+                    "POSITIVE"
+                    if expected == OrderReview.ClassificationStatus.AUTO_LABELED
+                    else None,
+                )
+
+    def test_invalid_callback_output_is_queued_and_invalid_protocol_rejected(self):
+        review = self.submit_review()
+        response = self.post_callback(
+            self.callback_payload(
+                review,
+                ai_valid=False,
+                ai_label=None,
+                ai_confidence=None,
+                ai_reason="Đầu ra không hợp lệ.",
+            )
+        )
+        self.assertEqual(response.status_code, 200)
+        review.refresh_from_db()
+        self.assertEqual(
+            review.classification_status,
+            OrderReview.ClassificationStatus.PENDING_REVIEW,
+        )
+        self.assertIsNone(review.ai_label)
+        self.assertIsNone(review.ai_confidence)
+
+        another_review = self.submit_review()
+        invalid = self.post_callback(
+            self.callback_payload(another_review, ai_confidence=float("nan"))
+        )
+        self.assertEqual(invalid.status_code, 400)
+        for confidence in (-0.01, 1.01, True):
+            with self.subTest(confidence=confidence):
+                self.assertEqual(
+                    self.post_callback(
+                        self.callback_payload(
+                            another_review,
+                            ai_confidence=confidence,
+                        )
+                    ).status_code,
+                    400,
+                )
+        self.assertEqual(
+            self.post_callback(
+                self.callback_payload(another_review, ai_label="UNKNOWN")
+            ).status_code,
+            400,
+        )
+
+    def test_callback_is_idempotent_and_conflicting_replay_is_rejected(self):
+        review = self.submit_review()
+        payload = self.callback_payload(review, ai_confidence=0.94)
+
+        first = self.post_callback(payload)
+        repeated = self.post_callback(payload)
+        conflict = self.post_callback({**payload, "ai_label": "NEUTRAL"})
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(repeated.json()["status"], "duplicate")
+        self.assertEqual(conflict.status_code, 409)
+        self.assertEqual(ReviewClassificationAudit.objects.filter(review=review).count(), 0)
+
+    def test_callback_is_csrf_exempt_only_on_callback_route(self):
+        review = self.submit_review()
+        strict_client = Client(enforce_csrf_checks=True)
+        callback = self.post_callback(self.callback_payload(review), client=strict_client)
+        self.assertEqual(callback.status_code, 200)
+
+        order = self.complete_order()
+        strict_client.force_login(self.customer)
+        protected = strict_client.post(
+            reverse("orders:customer_submit_order_review", kwargs={"pk": order.pk}),
+            {"rating": "5", "comment": "Tốt"},
+        )
+        self.assertEqual(protected.status_code, 403)
+
+    def test_staff_and_owner_can_review_but_customer_cannot(self):
+        review = self.submit_review()
+        self.post_callback(
+            self.callback_payload(review, ai_confidence=0.94)
+        )
+        queue_url = reverse("orders:staff_pending_review_classifications")
+        detail_url = reverse(
+            "orders:staff_review_classification_detail",
+            kwargs={"review_id": review.pk},
+        )
+
+        self.client.force_login(self.customer)
+        self.assertEqual(self.client.get(queue_url).status_code, 403)
+        self.assertEqual(self.client.get(detail_url).status_code, 403)
+
+        for reviewer in (self.staff, self.owner):
+            self.client.force_login(reviewer)
+            self.assertEqual(self.client.get(queue_url).status_code, 200)
+            detail = self.client.get(detail_url)
+            self.assertEqual(detail.status_code, 200)
+            self.assertContains(detail, "Bánh rất ngon")
+
+    def test_staff_confirmation_preserves_original_and_creates_audit(self):
+        review = self.submit_review("  Nội dung gốc  ")
+        self.post_callback(
+            self.callback_payload(review, ai_confidence=0.94)
+        )
+        detail_url = reverse(
+            "orders:staff_review_classification_detail",
+            kwargs={"review_id": review.pk},
+        )
+        self.client.force_login(self.staff)
+        detail = self.client.get(detail_url)
+        response = self.client.post(
+            detail_url,
+            {
+                "final_label": "NEGATIVE",
+                "review_note": "Đánh giá thủ công.",
+                "version": detail.context["review"].classification_version,
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        review.refresh_from_db()
+        self.assertEqual(review.comment, "  Nội dung gốc  ")
+        self.assertEqual(review.rating, 5)
+        self.assertEqual(review.final_label, "NEGATIVE")
+        self.assertEqual(review.reviewed_by, self.staff)
+        self.assertEqual(review.classification_status, OrderReview.ClassificationStatus.REVIEWED)
+        audit = ReviewClassificationAudit.objects.get(review=review)
+        self.assertEqual(audit.final_label, "NEGATIVE")
+        self.assertEqual(audit.reviewed_by, self.staff)
+
+    def test_stale_review_and_late_callback_do_not_overwrite_human_decision(self):
+        review = self.submit_review()
+        OrderReview.objects.filter(pk=review.pk).update(
+            classification_status=OrderReview.ClassificationStatus.PENDING_REVIEW,
+            classification_version=1,
+        )
+        confirm_review_classification(
+            review_id=review.pk,
+            reviewer=self.staff,
+            final_label="NEUTRAL",
+            review_note="Đã xác nhận.",
+            version=1,
+        )
+        with self.assertRaises(StaleReviewClassification):
+            confirm_review_classification(
+                review_id=review.pk,
+                reviewer=self.owner,
+                final_label="NEGATIVE",
+                review_note="Cập nhật cũ.",
+                version=1,
+            )
+        response = self.post_callback(self.callback_payload(review))
+        self.assertEqual(response.json()["status"], "ignored")
+        review.refresh_from_db()
+        self.assertEqual(review.final_label, "NEUTRAL")
+        self.assertEqual(review.reviewed_by, self.staff)
+
+
+class OrderReviewWindowTests(OrderWorkflowTestCase):
+    def complete_order(self, order=None, *, completed_at=None, status=None):
+        order = order or self.create_order()
+        completed_at = completed_at or timezone.now() - timedelta(hours=1)
+        Order.objects.filter(pk=order.pk).update(
+            status=status or Order.Status.HOAN_TAT,
+            completed_at=completed_at,
+        )
+        order.refresh_from_db()
+        return order
 
     def test_review_reminder_window_does_not_expire_review_eligibility(self):
         completed_at = timezone.now()

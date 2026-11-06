@@ -13,6 +13,7 @@ from .models import (
     Order,
     OrderAlternative,
     OrderIncident,
+    OrderReview,
     Payment,
     Quote,
     Refund,
@@ -1195,6 +1196,7 @@ class OrderReviewForm(forms.Form):
         label="Nhận xét (không bắt buộc)",
         max_length=2000,
         required=False,
+        strip=False,
         widget=forms.Textarea(
             attrs={
                 "rows": 4,
@@ -1205,7 +1207,7 @@ class OrderReviewForm(forms.Form):
     )
 
     def clean_comment(self):
-        return self.cleaned_data["comment"].strip()
+        return self.cleaned_data["comment"]
 
 
 class ReviewReplyForm(forms.Form):
@@ -1226,6 +1228,28 @@ class ReviewReplyForm(forms.Form):
         if not content:
             raise forms.ValidationError("Vui lòng nhập nội dung phản hồi.")
         return content
+
+
+class ReviewClassificationReviewForm(forms.Form):
+    final_label = forms.ChoiceField(
+        label="Nhãn cuối cùng",
+        choices=OrderReview.SentimentLabel.choices,
+    )
+    review_note = forms.CharField(
+        label="Lý do xác nhận",
+        max_length=2000,
+        widget=forms.Textarea(
+            attrs={
+                "rows": 3,
+                "maxlength": 2000,
+                "placeholder": "Ghi ngắn gọn căn cứ chọn nhãn.",
+            }
+        ),
+    )
+    version = forms.IntegerField(min_value=0, widget=forms.HiddenInput)
+
+    def clean_review_note(self):
+        return self.cleaned_data["review_note"].strip()
 
 
 class OwnerReviewFilterForm(forms.Form):

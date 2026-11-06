@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Đánh giá chờ xác nhận — BiBi Cake{% endblock %}
+
+{% block content %}
+<section class="management-page page-shell">
+    <div class="management-heading">
+        <div>
+            <span class="eyebrow">KIỂM DUYỆT NỘI BỘ</span>
+            <h1>Đánh giá chờ xác nhận</h1>
+            <p>Đánh giá có kết quả AI không hợp lệ hoặc độ tin cậy dưới 0,95.</p>
+        </div>
+    </div>
+    {% if page_obj.object_list %}
+        <div class="table-wrap">
+            <table class="management-table">
+                <thead><tr><th>Ngày</th><th>Mã đơn</th><th>Điểm</th><th>Nhận xét</th><th>Nhãn AI</th><th>Độ tin cậy</th><th></th></tr></thead>
+                <tbody>
+                    {% for review in page_obj %}
+                        <tr>
+                            <td>{{ review.created_at|date:"d/m/Y H:i" }}</td>
+                            <td><strong>{{ review.order.code }}</strong></td>
+                            <td>{{ review.rating }}/5</td>
+                            <td>{{ review.comment|default:"Không có nhận xét"|truncatechars:120 }}</td>
+                            <td>{{ review.get_ai_label_display|default:"Không hợp lệ" }}</td>
+                            <td>{% if review.ai_confidence != None %}{{ review.ai_confidence|floatformat:3 }}{% else %}—{% endif %}</td>
+                            <td><a class="text-link" href="{% url 'orders:staff_review_classification_detail' review.pk %}">Xác nhận</a></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% include "orders/partials/pagination.html" %}
+    {% else %}
+        <div class="empty-state">
+            <span aria-hidden="true">♡</span>
+            <h2>Không có đánh giá chờ xác nhận</h2>
+            <p>Khi n8n trả kết quả dưới ngưỡng hoặc không hợp lệ, đánh giá sẽ xuất hiện ở đây.</p>
+        </div>
+    {% endif %}
+</section>
+{% endblock %}
