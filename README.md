@@ -213,23 +213,14 @@ Trong phiên này, `manage.py test orders.test_reviews` chạy đạt 33 test; b
 - `accounts/` — custom User, xác thực, phân quyền và lệnh demo
 - `catalog/` — danh mục, mẫu bánh công khai và trang quản lý OWNER
 - `orders/` — đơn, báo giá, sản xuất/QA, lần giao, sự cố, thu/hoàn tiền, lịch sử và quy tắc chuyển trạng thái
-- `assistant/` — hội thoại AI tùy chọn, truy hồi catalog/chính sách, bản nháp và adapter provider
+- `assistant/` — quản lý chính sách cửa hàng và công bố nội dung cho khách hàng
 - `templates/`, `static/` — giao diện dùng chung, CSS và JavaScript nội bộ
 
-## Tư vấn AI — mốc 5.3
+## Chính sách cửa hàng
 
-Khách hàng đăng nhập có thể mô tả nhu cầu, xem gợi ý mẫu bánh đang nhận đặt, hỏi nội dung
-chính sách đã được OWNER công bố và chuẩn bị bản nháp. AI không tạo đơn, không xác nhận,
-không chốt giá/lịch, không xử lý thanh toán hoặc duyệt ảnh. Khách dùng nút “Dùng thông tin
-này để đặt bánh”, tự bổ sung người nhận/điện thoại/địa chỉ, kiểm tra rồi gửi form đặt bánh
-hiện có. Service đơn hàng vẫn kiểm tra lại mẫu và chống gửi trùng.
-
-AI mặc định **tắt**. Để cấu hình, mở `.env` sẵn có bằng `notepad .env`, nhập key mới vào
-`GEMINI_API_KEY` và đặt `AI_ENABLED=True`. Model mặc định là `gemini-3.8-flash` (có thể
-ghi rõ tại `GEMINI_MODEL`). Backend dùng SDK Python chính thức `google-genai`; key không
-được gửi xuống trình duyệt. Model này có trong danh mục model stable chính thức; quyền truy
-cập của API account cụ thể chưa được xác minh. Không dùng lại key từng được dán trong chat:
-hãy thu hồi/đổi key tại Google AI Studio và tự nhập key mới trong `.env`; không in/chia sẻ file.
+Khách hàng có thể xem nội dung đã được công bố tại `/policies/`. OWNER quản lý nội dung,
+công bố hoặc chuyển về bản nháp tại `/owner/assistant/policies/`. Sửa tiêu đề/nội dung của
+một chính sách đã công bố sẽ tạo phiên bản nháp mới; OWNER cần rà soát và công bố lại.
 
 Nạp bộ nội dung chính sách đề xuất cho demo (tất cả ở trạng thái nháp, không công bố):
 
@@ -237,37 +228,25 @@ Nạp bộ nội dung chính sách đề xuất cho demo (tất cả ở trạng
 .\.venv\Scripts\python.exe manage.py seed_demo_policies
 ```
 
-Lệnh yêu cầu đã có OWNER, tạo mã `CS01`–`CS12`, báo từng mã được tạo/bỏ qua và không ghi đè
-nội dung hoặc trạng thái đã có. OWNER rà soát nội dung và thao tác **Công bố** có POST/CSRF tại
-`/owner/assistant/policies/`. Sửa tiêu đề/nội dung đã công bố sẽ tạo phiên bản nháp mới; phải
-xem lại rồi công bố lại. Đây là chính sách đề xuất, chưa được cửa hàng xác nhận; không công bố
-trước khi đối chiếu quy trình thật. Trang khách xem nội dung đã công bố tại
-`/assistant/policies/<code>/`.
+Lệnh yêu cầu đã có OWNER, tạo các chính sách demo ở trạng thái nháp, bỏ qua mã đã tồn tại và
+không ghi đè nội dung hoặc trạng thái. Đây là dữ liệu đề xuất, chưa được cửa hàng xác nhận;
+OWNER cần đối chiếu quy trình thật trước khi công bố. Trang chính sách công khai và trang quản
+lý được bảo vệ ở backend theo vai trò và các thao tác thay đổi dùng POST/CSRF.
 
-Tư vấn sử dụng truy vấn database có giới hạn, không dùng tìm kiếm web hoặc vector database;
-chỉ gửi mẫu công khai/chính sách công bố liên quan. Mẫu bánh được lọc theo ngân sách rồi xếp
-hạng theo tên, danh mục và thuộc tính tư vấn OWNER đã xác nhận. Form quản lý mẫu có trường
-dịp, hương vị, phong cách, khẩu phần, thành phần và thông tin dị ứng. Dữ liệu demo được seed
-riêng, hiển thị nhãn chưa xác nhận, không thay thế dữ liệu OWNER kiểm chứng. OWNER chỉ đánh
-dấu xác nhận sau khi rà soát; sửa thuộc tính sẽ gỡ xác nhận. Khẩu phần/thành phần/dị ứng demo
-để trống. Chatbot không suy ra số khẩu phần từ tên, kích thước hoặc giá. Hội thoại, bản nháp, nguồn đã trích và
-chỉ số request được lưu trong các bảng `assistant_*`. Mỗi khách chỉ đọc phiên của mình.
-Trước khi gửi provider, backend lọc email, số điện thoại, địa chỉ/tên người nhận và giá trị
-nhạy cảm được gắn nhãn; giao diện nhắc khách không nhập dữ liệu đó. Không cấp công cụ ghi đơn
-cho Gemini. Khi provider lỗi, nguồn catalog/chính sách phù hợp được trả bằng chế độ tra cứu
-cục bộ có thông báo rõ; nếu không có nguồn thì chatbot đề nghị nhân viên xác nhận/thử lại.
-Không tạo order từ chat. Xem [AI_ASSISTANT.md](./AI_ASSISTANT.md) để biết phạm vi, adapter,
-giới hạn, URLs, policy demo và test mock.
-
-Để điền gợi ý demo dựa trên tên/mô tả sẵn có cho catalog mẫu (lệnh không ghi đè trường đã
-nhập và không đánh dấu xác nhận), OWNER có thể rà soát tại `/owner/catalog/cakes/`:
+Để điền một số thông tin mô tả demo cho catalog mẫu (lệnh không ghi đè trường đã nhập và
+không đánh dấu xác nhận), OWNER có thể rà soát tại `/owner/catalog/cakes/`:
 
 ```powershell
 .\.venv\Scripts\python.exe manage.py seed_demo_advisory_data
 ```
 
-Workflow webhook ở mốc 5.2 vẫn hoạt động độc lập; chatbot không đi qua workflow và không gửi
-email. Test chỉ dùng provider mock, không gọi API thật. Chính sách demo có điểm chưa khớp chức
-năng: nhắc khách sau 30 phút về ảnh chưa tự động; luồng CUSTOMER yêu cầu hủy đơn chung như CS09
-chưa hoàn chỉnh; khoản chuyển khoản vẫn cần nhân viên ghi nhận, không xác minh ngân hàng.
-Không coi nội dung nháp là quy tắc vận hành.
+Workflow webhook ở mốc 5.2 hoạt động độc lập với việc xem và quản lý chính sách cửa hàng.
+Ứng dụng không cung cấp chatbot tư vấn đặt bánh hoặc chức năng phân loại đánh giá bằng AI.
+Các chức năng AI đó chưa thuộc phạm vi đang triển khai; nội dung nháp trong chính sách demo
+không phải quy tắc vận hành đã được cửa hàng xác nhận.
+
+Migration `assistant.0004_remove_airequestlog_draft_and_more` chỉ xóa các bảng phiên chat,
+tin nhắn, bản nháp chatbot và nhật ký gọi AI. Nó không xóa đơn hàng, catalog hoặc `StorePolicy`.
+Migration này chưa được áp dụng lên database hiện có trong lần cập nhật mã; hãy sao lưu và
+rà soát trước khi chủ động chạy `.\.venv\Scripts\python.exe manage.py migrate`, vì dữ liệu
+trong bốn bảng chatbot sẽ bị xóa.

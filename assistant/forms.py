@@ -1,29 +1,6 @@
-import uuid
-
 from django import forms
 
-from .ai import MAX_USER_MESSAGE_CHARS
 from .models import StorePolicy
-
-
-class ChatMessageForm(forms.Form):
-    request_id = forms.UUIDField(widget=forms.HiddenInput, initial=uuid.uuid4)
-    content = forms.CharField(
-        label="Tin nhắn",
-        max_length=MAX_USER_MESSAGE_CHARS,
-        widget=forms.Textarea(
-            attrs={
-                "rows": 3,
-                "placeholder": "Ví dụ: Mình cần bánh dâu cho sinh nhật...",
-            }
-        ),
-    )
-
-    def clean_content(self):
-        content = self.cleaned_data["content"].strip()
-        if not content:
-            raise forms.ValidationError("Vui lòng nhập nội dung cần tư vấn.")
-        return content
 
 
 class StorePolicyForm(forms.ModelForm):

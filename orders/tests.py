@@ -112,6 +112,19 @@ class OrderWorkflowTestCase(TestCase):
 
 
 class OrderCreationAndPermissionTests(OrderWorkflowTestCase):
+    def test_direct_order_form_does_not_use_chatbot_draft_query(self):
+        self.client.force_login(self.customer)
+        url = reverse(
+            "orders:create_order",
+            kwargs={"slug": self.cake.slug},
+        )
+
+        response = self.client.get(f"{url}?draft=not-a-valid-draft")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.cake.name)
+        self.assertNotContains(response, "draft_id")
+
     def test_create_order_snapshots_catalog_price_and_ignores_client_price(self):
         self.client.force_login(self.customer)
         response = self.client.post(

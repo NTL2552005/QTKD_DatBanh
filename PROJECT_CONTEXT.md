@@ -55,7 +55,7 @@ Vai trò nghiệp vụ độc lập với `is_staff` và `is_superuser` của Dj
 
 ## Phạm vi chưa triển khai và tiếp theo
 
-Đã triển khai các luồng đặt bánh/báo giá, sản xuất/QA/duyệt ảnh, giao hàng, xử lý sự cố, thu/hoàn tiền, đánh giá nội bộ, outbox webhook và lớp tư vấn AI dùng truy hồi catalog/chính sách. Chatbot tích hợp SDK Python chính thức `google-genai`; mặc định chọn Gemini `gemini-3.8-flash` với JSON structured output, nhưng AI mặc định tắt và chưa gọi API thật. Chưa triển khai giao dịch tiền tự động, xác minh API ngân hàng, vận chuyển/GPS, cấu hình workflow/email thật, callback nhà cung cấp email hoặc kiểm thử concurrency đa tiến trình trên PostgreSQL.
+Đã triển khai các luồng đặt bánh/báo giá, sản xuất/QA/duyệt ảnh, giao hàng, xử lý sự cố, thu/hoàn tiền, đánh giá nội bộ, outbox webhook và quản lý chính sách cửa hàng. Chatbot tư vấn đặt bánh đã được loại khỏi phạm vi; không có chức năng AI phân loại đánh giá được triển khai. Chưa triển khai giao dịch tiền tự động, xác minh API ngân hàng, vận chuyển/GPS, cấu hình workflow/email thật, callback nhà cung cấp email hoặc kiểm thử concurrency đa tiến trình trên PostgreSQL.
 
 ## Mốc đánh giá và workflow thông báo
 
@@ -88,7 +88,7 @@ Vai trò nghiệp vụ độc lập với `is_staff` và `is_superuser` của Dj
 - Cửa sổ 24 giờ sau hoàn tất là mốc nhắc workflow, không phải hạn gửi: đơn chưa đánh giá vẫn có thể được đánh giá sau mốc. Đơn cũ chỉ được backfill từ lịch sử `ORDER_COMPLETED`; nếu không có mốc đáng tin thì yêu cầu kiểm tra.
 - Outbox `WorkflowEvent` (`orders_workflowevent`) và `WorkflowRetryRequest` (`orders_workflowretryrequest`) lưu ba sự kiện `order.confirmed`, `cake.review_requested`, `order.completed`; ghi cùng transaction nghiệp vụ, chống trùng bằng `business_key` duy nhất và giữ `event_id`/payload khi retry.
 - `WORKFLOW_ENABLED` mặc định tắt. Dispatcher `dispatch_workflow_events` gửi theo lô hữu hạn, lease 60 giây, timeout tối đa 30 giây, retry tăng dần tối đa 5 lần mỗi chu kỳ; OWNER theo dõi và xếp retry bằng POST ở `/owner/workflow-events/`.
-- `delivered` chỉ xác nhận webhook trả 2xx, không xác nhận email được gửi/nhận. Hiện chưa cấu hình endpoint workflow hoặc nhà cung cấp email; chưa có callback email thật. Chatbot ở mốc 5.3 được mô tả riêng bên dưới và không phụ thuộc workflow.
+- `delivered` chỉ xác nhận webhook trả 2xx, không xác nhận email được gửi/nhận. Hiện chưa cấu hình endpoint workflow hoặc nhà cung cấp email; chưa có callback email thật.
 - `DeliveryAttempt` ghi riêng từng lần giao, snapshot thông tin nhận hàng, nhân viên, kết quả, nguồn xác nhận và minh chứng riêng tư. Chỉ STAFF bắt đầu giao; CUSTOMER xác nhận hoặc báo sự cố; STAFF có thể xác nhận bàn giao hộ với ghi chú và nguồn STAFF rõ ràng.
 - Các trạng thái giao mới gồm `DANG_GIAO`, `GIAO_THAT_BAI`, `CHO_XU_LY_SU_CO`, `DA_GIAO_CHO_THANH_TOAN`, `HOAN_TAT` và `DA_HUY`. `payment_status` độc lập; `Payment` và `Refund` lưu số tiền Decimal, người xác nhận, thời điểm, mã idempotency và tham chiếu.
 - STAFF ghi nhận tiền đã thực nhận sau đối chiếu thủ công; hệ thống không gọi API ngân hàng/vận chuyển và không xem ảnh chuyển khoản là giao dịch. Refund chỉ ghi sau khi thực hiện bên ngoài; OWNER duyệt phương án hủy không tự đánh dấu đã hoàn.
@@ -98,12 +98,10 @@ Vai trò nghiệp vụ độc lập với `is_staff` và `is_superuser` của Dj
 - Đã áp dụng migration `orders.0004_order_delivery_reschedule_note_and_more`; không xóa database, migration hay dữ liệu hiện có.
 - `manage.py check` và `makemigrations --check --dry-run` đạt; targeted delivery tests 18/18; toàn bộ tests 92/92.
 
-## Mốc tư vấn AI 5.3
+## Phạm vi chatbot sau khi loại bỏ
 
-- App `assistant` có hội thoại riêng theo CUSTOMER, bản nháp 7 ngày, log request và `StorePolicy` do OWNER quản lý. Provider mặc định Gemini qua SDK chính thức `google-genai`; model cấu hình mặc định `gemini-3.8-flash` có trong catalog stable chính thức (đã kiểm tra 31/10/2026), nhưng quyền của API account thực tế chưa được xác minh. AI tắt mặc định.
-- Lệnh `seed_demo_policies` tạo 12 mã `CS01`–`CS12` ở trạng thái nháp, giữ nguyên các bản ghi có sẵn; chỉ OWNER có thể rà soát và công bố/ẩn qua POST/CSRF. Nội dung do người dùng cung cấp là dữ liệu đề xuất cho đồ án, chưa phải chính sách cửa hàng đã xác nhận.
-- Chatbot chỉ truy hồi mẫu công khai/chính sách đang công bố, kiểm tra ID/schema/ngày/số lượng ở backend, và chỉ lưu `AIDraft`; khách tự dùng form đặt hiện có, nơi service xác minh lại mẫu/chống trùng. Gemini không có công cụ ghi đơn/nghiệp vụ. Hệ thống chặn một số tuyên bố không có thẩm quyền và local fallback dùng dữ liệu thật, nêu rõ chế độ tra cứu.
-- Catalog có các trường tư vấn tùy chọn và cờ `advisory_data_verified`. Gợi ý demo chưa xác nhận hiển thị cảnh báo; lệnh `seed_demo_advisory_data` chỉ điền trường trống và không ghi đè dữ liệu OWNER. OWNER chỉ đánh dấu xác nhận sau khi rà soát; sửa dữ liệu sẽ gỡ cờ. Retrieval lọc ngân sách ở backend rồi xếp hạng theo thuộc tính, không suy đoán trường trống.
-- Nội dung tư vấn cần thiết và nguồn công khai liên quan được gửi tới provider khi gọi. Backend redaction email, số điện thoại, địa chỉ/tên người nhận và giá trị bí mật có nhãn; giao diện nhắc khách không nhập thông tin này. Câu trả lời render an toàn, citations dùng source IDs đã kiểm tra và URL do backend dựng.
-- Chênh lệch cần lưu ý trước khi OWNER công bố: nhắc khách sau 30 phút về ảnh chưa tự động; luồng CUSTOMER yêu cầu hủy chung trong CS09 chưa hoàn chỉnh; chuyển khoản không được xác minh ngân hàng tự động. Xem `AI_ASSISTANT.md` để biết chi tiết.
-- Bộ test provider dùng mock; chưa gọi API thật. Kết quả kiểm tra gần nhất trước thay đổi này là 172 test; cần cập nhật số sau khi hoàn tất toàn bộ suite hiện tại.
+- App `assistant` tiếp tục lưu `StorePolicy`. OWNER quản lý/chỉnh sửa/công bố chính sách; khách xem các nội dung đã công bố tại `/policies/`. Các thao tác quản trị được bảo vệ bằng role backend và POST/CSRF.
+- Chatbot, phiên hội thoại, bản nháp đơn từ hội thoại, nhật ký gọi AI, cấu hình provider và dependency Gemini đã được loại bỏ khỏi mã nguồn hiện hành. Migration mới xóa các bảng chatbot; cần xem chi tiết migration trước khi áp dụng vì dữ liệu chatbot cũ trong các bảng đó sẽ bị xóa.
+- `seed_demo_policies` chỉ tạo nội dung đề xuất trạng thái nháp và không ghi đè chính sách đã có. Nội dung chính sách hiện có được giữ lại; OWNER cần rà soát nội dung cũ trước khi công bố. Catalog advisory data và workflow webhook/email vẫn độc lập với chức năng chính sách.
+- Chức năng phân loại đánh giá bằng AI qua n8n cũng chưa được tích hợp vào mã nguồn hiện tại.
+- Sau thay đổi: `manage.py check`, `makemigrations --check --dry-run` và `git diff --check` đạt; `manage.py test` đạt 189/189 trên test database tạm. Không áp dụng migration lên database dự án.

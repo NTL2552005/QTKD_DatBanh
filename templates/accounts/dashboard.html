@@ -83,6 +83,7 @@
                 <p>Phương án tiếp nhận chờ chủ duyệt: <strong>{{ pending_intake_alternatives }}</strong></p>
                 <p>Đơn tiếp nhận chủ đang xử lý: <strong>{{ pending_intake_orders }}</strong></p>
                 <a class="button button-outline" href="{% url 'orders:owner_intake_order_list' %}">Mở hàng đợi tiếp nhận</a>
+                <a class="button button-outline" href="{% url 'orders:staff_pending_review_classifications' %}">Đánh giá chờ xác nhận</a>
                 <a class="button button-outline" href="{% url 'orders:owner_approval_list' %}">Xem yêu cầu chủ duyệt</a>
                 <p>Sự cố đơn hàng chờ quyết định: <strong>{{ pending_incidents }}</strong></p>
                 <a class="button button-outline" href="{% url 'orders:owner_incident_list' %}">Xem sự cố cần duyệt</a>

@@ -44,7 +44,7 @@ Báo giá chính thức thể hiện nội dung bánh, số lượng, giá, phí
 
 Báo giá có hiệu lực theo thời hạn ghi trên báo giá. Khi hết hạn hoặc yêu cầu thay đổi, cửa hàng cần kiểm tra và phản hồi lại.
 
-Chatbot không tự đưa ra giảm giá, phụ phí hoặc giá bánh tùy chỉnh chưa được cửa hàng xác nhận.""",
+Mọi mức giảm giá, phụ phí hoặc giá bánh tùy chỉnh cần được cửa hàng xác nhận trong báo giá.""",
     ),
     (
         "CS05",
@@ -55,7 +55,7 @@ Cửa hàng xem xét khả năng điều chỉnh theo tiến độ. Khi bánh đ
 
 Nếu thay đổi ảnh hưởng đến giá, thời gian hoặc điều kiện, cửa hàng thông báo để khách xem xét và đồng ý trước khi áp dụng.
 
-Chatbot chỉ ghi nhận nhu cầu, không tự phê duyệt thay đổi.""",
+Việc gửi đề nghị thay đổi chưa đồng nghĩa cửa hàng đã phê duyệt.""",
     ),
     (
         "CS06",
@@ -75,7 +75,7 @@ Yêu cầu chỉnh sửa được xem xét theo phạm vi có thể thực hiệ
 
 Thời gian nhập ban đầu là thời gian đề nghị. Thời gian cam kết thực hiện được thể hiện trong báo giá hoặc nội dung xác nhận hai bên đã thống nhất.
 
-Phí giao hàng, nếu có, được thông báo trong báo giá. Chatbot không tự tính phí khi chưa có dữ liệu hoặc quy tắc tính phù hợp.
+Phí giao hàng, nếu có, được thông báo trong báo giá; khách không nên tự suy đoán khoản phí khi chưa được xác nhận.
 
 Nếu phát sinh sự cố giao hàng, cửa hàng liên hệ khách để thống nhất phương án xử lý.""",
     ),
@@ -99,7 +99,7 @@ Nếu bánh chưa bắt đầu làm, nhân viên kiểm tra và xử lý yêu c�
 
 Gửi yêu cầu hủy chưa làm đơn tự động bị hủy. Cửa hàng thông báo kết quả sau khi hoàn tất xử lý.
 
-Nếu hủy được chấp nhận và có tiền đã thanh toán, cửa hàng kiểm tra để thông báo phương án hoàn tiền cụ thể. Chatbot không tự cam kết số tiền, tỷ lệ hoặc thời gian hoàn tiền.""",
+Nếu hủy được chấp nhận và có tiền đã thanh toán, cửa hàng kiểm tra để thông báo phương án hoàn tiền cụ thể.""",
     ),
     (
         "CS10",
@@ -108,7 +108,7 @@ Nếu hủy được chấp nhận và có tiền đã thanh toán, cửa hàng 
 
 Cửa hàng kiểm tra và trao đổi phương án phù hợp: sửa bánh, đổi bánh, giao lại hoặc xem xét hủy và hoàn tiền.
 
-Phương án cụ thể phụ thuộc kết quả kiểm tra và trao đổi. Chatbot không tự kết luận trách nhiệm hoặc cam kết bồi thường.""",
+Phương án cụ thể phụ thuộc kết quả kiểm tra và trao đổi với khách.""",
     ),
     (
         "CS11",
@@ -121,20 +121,18 @@ Nếu cần xử lý sự cố, khách nên gửi phản ánh qua chức năng h
     ),
     (
         "CS12",
-        "Phạm vi tư vấn bằng AI",
-        """Chatbot BiBi Cake hỗ trợ tìm hiểu mẫu bánh, giá niêm yết, chính sách đã công bố và chuẩn bị bản nháp yêu cầu đặt bánh.
+        "Thông tin và xác nhận của cửa hàng",
+        """Thông tin trên website có thể mang tính tham khảo. Cửa hàng kiểm tra yêu cầu cụ thể và xác nhận điều kiện thực hiện qua báo giá hoặc trao đổi trên đơn.
 
-Nội dung tư vấn mang tính tham khảo. Chatbot không thay nhân viên hoặc chủ quyết định nhận đơn, báo giá chính thức, phê duyệt, xác nhận thanh toán, hủy hoặc hoàn tiền.
+Gửi yêu cầu đặt bánh chưa đồng nghĩa đơn đã được cửa hàng nhận thực hiện. Khách chỉ xác nhận đơn sau khi đồng ý báo giá chính thức.
 
-Khi chưa có thông tin xác nhận, chatbot đề nghị khách gửi yêu cầu để cửa hàng kiểm tra.
-
-Khách không nên gửi mật khẩu, mã OTP hoặc thông tin thẻ thanh toán vào hội thoại.""",
+Các thay đổi về giá, thời gian, thanh toán, giao nhận hoặc xử lý sự cố cần được xác nhận qua chức năng nghiệp vụ hoặc trao đổi với nhân viên.""",
     ),
 )
 
 
 class Command(BaseCommand):
-    help = "Tạo 12 chính sách demo ở trạng thái nháp, không ghi đè nội dung có sẵn."
+    help = "Tạo chính sách demo ở trạng thái nháp, không ghi đè nội dung có sẵn."
 
     def handle(self, *args, **options):
         user_model = get_user_model()

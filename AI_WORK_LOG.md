@@ -401,3 +401,29 @@ Hoàn thiện đánh giá sau đơn và thêm outbox/webhook cho `order.confirme
 - `manage.py check`, `makemigrations --check --dry-run`, `migrate --check` và `git diff --check`: đạt.
 - Migration `catalog.0004` đã áp dụng thành công vào database hiện tại; không xóa dữ liệu.
 - Không gọi Gemini/API thật.
+
+## 2026-11-06 — Loại bỏ chatbot
+
+### Yêu cầu
+
+- Gỡ chatbot tư vấn và các phần chỉ phục vụ hội thoại, bản nháp, nhật ký gọi AI.
+- Giữ danh mục/chính sách, đặt bánh trực tiếp, nghiệp vụ đơn hàng và workflow webhook.
+- Tạo migration mới nhưng không áp dụng lên database dự án; không xây chức năng phân loại đánh giá bằng AI.
+
+### Thay đổi
+
+- Xóa adapter AI, form/view/URL chat, template, CSS/JavaScript chat và tài liệu triển khai chatbot; giữ app `assistant` để quản lý `StorePolicy`.
+- Bỏ nhánh nạp/claim bản nháp trong form tạo đơn, giữ nguyên biểu mẫu đặt bánh trực tiếp.
+- Thêm trang danh sách chính sách công khai; cập nhật điều hướng và trang OWNER.
+- Tạo `assistant.0004` để xóa `AIRequestLog`, `AIDraft`, `ChatMessage`, `ChatSession`; giữ nguyên migration cũ.
+- Xóa các cài đặt AI khỏi `config/settings.py`, `.env.example` và `.env` local; gỡ `google-genai` khỏi `requirements.txt` và `.venv`.
+- Cập nhật README, PROJECT_CONTEXT và tài liệu thiết kế/kiểm thử liên quan. Không sửa workflow outbox/email hoặc thêm AI phân loại đánh giá.
+
+### Kiểm tra thực tế
+
+- `manage.py check`: đạt, không có lỗi.
+- `manage.py makemigrations --check --dry-run`: đạt, không còn thay đổi model chưa có migration.
+- `manage.py test`: 189/189 đạt trên test database tạm; migration được chạy trên test DB và test DB được hủy khi hoàn tất.
+- `git diff --check`: đạt.
+- Lần chạy test đầu phát hiện migration tự sinh không tương thích với thứ tự dựng lại bảng SQLite; sửa migration mới thành xóa model trực tiếp theo quan hệ phụ thuộc và chạy lại thành công.
+- Không chạy `migrate` trên database dự án; dữ liệu chat cũ chỉ bị xóa nếu người dùng chủ động áp dụng migration `assistant.0004`.

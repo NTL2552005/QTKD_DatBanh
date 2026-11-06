@@ -25,14 +25,15 @@
             <div class="nav-links" id="primary-nav">
                 <a href="{% url 'home' %}">Trang chủ</a>
                 <a href="{% url 'catalog:cake_list' %}">Mẫu bánh</a>
+                <a href="{% url 'assistant:policy_list' %}">Chính sách cửa hàng</a>
                 {% if user.is_authenticated %}
                     {% if user.role == "CUSTOMER" %}
                         <a href="{% url 'accounts:customer_dashboard' %}">Khu vực khách hàng</a>
                         <a href="{% url 'orders:customer_order_list' %}">Đơn của tôi</a>
-                        <a href="{% url 'assistant:index' %}">Tư vấn AI</a>
                     {% elif user.role == "STAFF" %}
                         <a href="{% url 'accounts:staff_dashboard' %}">Khu vực nhân viên</a>
                         <a href="{% url 'orders:staff_order_list' %}">Tiếp nhận đơn</a>
+                        <a href="{% url 'orders:staff_pending_review_classifications' %}">Đánh giá chờ xác nhận</a>
                     {% elif user.role == "OWNER" %}
                         <a href="{% url 'accounts:owner_dashboard' %}">Khu vực chủ cửa hàng</a>
                         <a href="{% url 'orders:owner_intake_order_list' %}">Tiếp nhận đơn vượt quyền</a>
@@ -41,8 +42,9 @@
                         <a href="{% url 'orders:owner_approval_list' %}">Duyệt chỉnh sửa</a>
                         <a href="{% url 'orders:owner_incident_list' %}">Duyệt sự cố</a>
                         <a href="{% url 'orders:owner_review_list' %}">Đánh giá khách hàng</a>
+                        <a href="{% url 'orders:staff_pending_review_classifications' %}">Đánh giá chờ xác nhận</a>
                         <a href="{% url 'orders:owner_workflow_event_list' %}">Giám sát workflow</a>
-                        <a href="{% url 'assistant:owner_policy_list' %}">Chính sách chatbot</a>
+                        <a href="{% url 'assistant:owner_policy_list' %}">Chính sách cửa hàng</a>
                     {% endif %}
                     <span class="nav-greeting">{{ user.first_name|default:user.username }}</span>
                     <form method="post" action="{% url 'accounts:logout' %}" class="logout-form">

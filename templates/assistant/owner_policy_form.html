@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}{{ page_title }} — Chính sách chatbot{% endblock %}
-{% block extra_styles %}<link rel="stylesheet" href="{% static 'css/assistant.css' %}">{% endblock %}
+{% block title %}{{ page_title }} — Chính sách cửa hàng{% endblock %}
+{% block extra_styles %}<link rel="stylesheet" href="{% static 'css/store-policies.css' %}">{% endblock %}
 
 {% block content %}
-<section class="page-shell assistant-page">
+<section class="page-shell policy-page">
     <a class="back-link" href="{% url 'assistant:owner_policy_list' %}">← Danh sách chính sách</a>
     <div class="management-form-card">
         <span class="eyebrow">CHỈ DÀNH CHO OWNER</span>

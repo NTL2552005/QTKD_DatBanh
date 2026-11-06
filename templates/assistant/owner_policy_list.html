@@ -1,16 +1,16 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Chính sách chatbot — BiBi Cake{% endblock %}
-{% block extra_styles %}<link rel="stylesheet" href="{% static 'css/assistant.css' %}">{% endblock %}
+{% block title %}Chính sách cửa hàng — BiBi Cake{% endblock %}
+{% block extra_styles %}<link rel="stylesheet" href="{% static 'css/store-policies.css' %}">{% endblock %}
 
 {% block content %}
-<section class="page-shell assistant-page">
-    <div class="assistant-owner-heading">
+<section class="page-shell policy-page">
+    <div class="policy-owner-heading">
         <div>
-            <span class="eyebrow">QUẢN LÝ NỘI DUNG TRUY HỒI</span>
+            <span class="eyebrow">QUẢN LÝ NỘI DUNG CỬA HÀNG</span>
             <h1>Chính sách cửa hàng</h1>
-            <p class="muted">Chỉ OWNER có thể sửa và công bố. Chính sách demo được nạp ở trạng thái nháp; nội dung cần được rà soát trước khi công bố.</p>
+            <p class="muted">Chỉ OWNER có thể sửa và công bố. Chính sách demo được nạp ở trạng thái nháp; nội dung cần được rà soát trước khi công bố cho khách hàng.</p>
         </div>
         <a class="button button-primary" href="{% url 'assistant:owner_policy_create' %}">Thêm chính sách</a>
     </div>
@@ -48,7 +48,7 @@
         <div class="empty-state">
             <span aria-hidden="true">✿</span>
             <h2>Chưa có nội dung chính sách</h2>
-            <p>Thêm nội dung đã được cửa hàng duyệt trước khi công bố cho chatbot. Không tạo quy định mẫu như chính sách thật.</p>
+            <p>Thêm nội dung đã được cửa hàng duyệt trước khi công bố. Không coi nội dung mẫu là chính sách thật khi chưa được rà soát.</p>
         </div>
     {% endif %}
 </section>

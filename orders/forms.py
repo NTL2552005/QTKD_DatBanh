@@ -73,7 +73,6 @@ class OrderRequestFieldsMixin:
 
 class OrderCreateForm(OrderRequestFieldsMixin, forms.Form):
     request_key = forms.UUIDField(widget=forms.HiddenInput, initial=uuid.uuid4)
-    draft_id = forms.UUIDField(widget=forms.HiddenInput, required=False)
     size = forms.CharField(label="Kích thước", max_length=80)
     flavor = forms.CharField(label="Hương vị", max_length=100)
     quantity = forms.IntegerField(

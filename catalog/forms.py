@@ -69,9 +69,9 @@ class CakeTemplateForm(forms.ModelForm):
             "style_tags": "Ví dụ: tối giản, hoa kem. Chỉ nhập đặc điểm có thật của mẫu.",
             "serving_information": "Không tự ước lượng số người; để trống nếu cửa hàng chưa xác nhận.",
             "ingredient_information": "Thông tin thành phần cần được cửa hàng xác nhận.",
-            "allergen_information": "Không để chatbot tự kết luận bánh an toàn với dị ứng.",
+            "allergen_information": "Không cam kết an toàn với dị ứng khi chưa xác minh đầy đủ thành phần.",
             "advisory_data_verified": (
-                "Chỉ đánh dấu sau khi cửa hàng kiểm tra và xác nhận toàn bộ dữ liệu tư vấn "
+                "Chỉ đánh dấu sau khi cửa hàng kiểm tra và xác nhận toàn bộ thông tin "
                 "đã nhập. Gợi ý demo chưa xác nhận phải để bỏ chọn."
             ),
         }

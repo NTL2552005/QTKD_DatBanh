@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Chính sách cửa hàng — BiBi Cake{% endblock %}
+{% block extra_styles %}<link rel="stylesheet" href="{% static 'css/store-policies.css' %}">{% endblock %}
+
+{% block content %}
+<section class="page-shell policy-page">
+    <header class="policy-heading">
+        <span class="eyebrow">THÔNG TIN DÀNH CHO KHÁCH HÀNG</span>
+        <h1>Chính sách cửa hàng</h1>
+        <p class="muted">Các nội dung đã được cửa hàng công bố.</p>
+    </header>
+    {% if policies %}
+        <div class="policy-list">
+            {% for policy in policies %}
+                <article class="policy-content-panel">
+                    <span class="eyebrow">{{ policy.code }} · PHIÊN BẢN {{ policy.version }}</span>
+                    <h2><a href="{% url 'assistant:policy_detail' policy.code %}">{{ policy.title }}</a></h2>
+                    <p class="field-help">Cập nhật {{ policy.updated_at|date:"d/m/Y H:i" }}</p>
+                    <p>{{ policy.content|truncatechars:240 }}</p>
+                    <a class="text-link" href="{% url 'assistant:policy_detail' policy.code %}">Xem nội dung</a>
+                </article>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <h2>Chưa có chính sách được công bố</h2>
+            <p>Thông tin sẽ hiển thị tại đây sau khi được cửa hàng rà soát và công bố.</p>
+        </div>
+    {% endif %}
+</section>
+{% endblock %}

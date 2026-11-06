@@ -2,12 +2,12 @@
 {% load static %}
 
 {% block title %}{{ policy.title }} — BiBi Cake{% endblock %}
-{% block extra_styles %}<link rel="stylesheet" href="{% static 'css/assistant.css' %}">{% endblock %}
+{% block extra_styles %}<link rel="stylesheet" href="{% static 'css/store-policies.css' %}">{% endblock %}
 
 {% block content %}
-<section class="page-shell assistant-page">
-    <a class="back-link" href="{% url 'assistant:index' %}">← Tư vấn BiBi Cake</a>
-    <article class="assistant-results">
+<section class="page-shell policy-page">
+    <a class="back-link" href="{% url 'assistant:policy_list' %}">← Chính sách cửa hàng</a>
+    <article class="policy-content-panel">
         <span class="eyebrow">CHÍNH SÁCH ĐÃ CÔNG BỐ · {{ policy.code }} · PHIÊN BẢN {{ policy.version }}</span>
         <h1>{{ policy.title }}</h1>
         <p class="field-help">Cập nhật {{ policy.updated_at|date:"d/m/Y H:i" }}</p>

@@ -214,80 +214,16 @@ def create_order_view(request, slug):
         CakeTemplate.objects.public().select_related("category"),
         slug=slug,
     )
-    initial = {}
-    draft = None
-    if request.method == "GET" and request.GET.get("draft"):
-        from assistant.models import AIDraft
-
-        draft = get_object_or_404(
-            AIDraft.objects.filter(customer=request.user),
-            pk=request.GET["draft"],
-        )
-        if draft.order_id:
-            messages.info(request, "Bản nháp này đã được dùng để gửi yêu cầu đặt bánh.")
-            return redirect("orders:order_detail", pk=draft.order_id)
-        if draft.expires_at <= timezone.now():
-            messages.warning(request, "Bản nháp đã hết hạn. Vui lòng nhập thông tin mới.")
-        elif draft.cake_template_id != cake.pk:
-            raise PermissionDenied
-        else:
-            initial = {
-                "draft_id": str(draft.pk),
-                "size": draft.size,
-                "flavor": draft.flavor,
-                "quantity": draft.quantity,
-                "inscription": draft.inscription,
-                "decoration_request": draft.decoration_request,
-            }
-            if draft.requested_delivery_date and draft.requested_delivery_time:
-                desired_at = datetime.combine(
-                    draft.requested_delivery_date,
-                    draft.requested_delivery_time,
-                )
-                initial["desired_delivery_at"] = timezone.make_aware(
-                    desired_at,
-                    timezone.get_current_timezone(),
-                )
-    form = OrderCreateForm(request.POST or None, initial=initial)
+    form = OrderCreateForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         try:
             with transaction.atomic():
-                draft_id = form.cleaned_data.get("draft_id")
-                if draft_id:
-                    from assistant.models import AIDraft
-
-                    draft = get_object_or_404(
-                        AIDraft.objects.filter(customer=request.user),
-                        pk=draft_id,
-                    )
-                    if draft.cake_template_id != cake.pk:
-                        raise ValidationError("Mẫu bánh không khớp với bản nháp.")
-                    if not draft.order_id and draft.expires_at <= timezone.now():
-                        raise ValidationError("Bản nháp đã hết hạn; vui lòng kiểm tra lại.")
                 order, created = create_order(
                     customer=request.user,
                     cake_id=cake.pk,
                     request_key=form.cleaned_data["request_key"],
                     data=form.cleaned_data,
                 )
-                if draft_id:
-                    if draft.order_id and draft.order_id != order.pk:
-                        raise ValidationError(
-                            "Bản nháp đã được sử dụng cho một yêu cầu đặt bánh khác."
-                        )
-                    if not draft.order_id:
-                        claimed = AIDraft.objects.filter(
-                            pk=draft.pk,
-                            customer=request.user,
-                            order__isnull=True,
-                            expires_at__gt=timezone.now(),
-                        ).update(order=order, updated_at=timezone.now())
-                        if not claimed:
-                            draft.refresh_from_db()
-                            if draft.order_id != order.pk:
-                                raise ValidationError(
-                                    "Bản nháp vừa được sử dụng. Vui lòng kiểm tra đơn của bạn."
-                                )
         except (OrderActionError, ValidationError) as exc:
             if isinstance(exc, ValidationError):
                 message = "; ".join(exc.messages)
@@ -309,7 +245,6 @@ def create_order_view(request, slug):
             "form": form,
             "cake": cake,
             "page_title": "Gửi yêu cầu đặt bánh",
-            "draft": draft,
         },
     )
 

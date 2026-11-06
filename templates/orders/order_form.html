@@ -24,7 +24,6 @@
                 {% csrf_token %}
                 {% if form.non_field_errors %}<div class="form-errors">{{ form.non_field_errors }}</div>{% endif %}
                 {{ form.request_key }}
-                {{ form.draft_id }}
                 {% for field in form %}
                     {% if not field.is_hidden %}
                         <div class="form-field">
